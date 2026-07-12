@@ -85,7 +85,7 @@ body,
 }
 
 .pet-shell:not(.is-sleeping) #arm-left,
-.pet-shell:not(.is-sleeping) #arm-right {
+.pet-shell:not(.is-sleeping) #arm-right-motion {
   transform-box: fill-box;
   transform-origin: 50% 12%;
 }
@@ -94,7 +94,7 @@ body,
   animation: pet-arm-left 3.6s ease-in-out infinite;
 }
 
-.pet-shell:not(.is-sleeping) #arm-right {
+.pet-shell:not(.is-sleeping) #arm-right-motion {
   animation: pet-arm-right 3.6s ease-in-out infinite;
 }
 
@@ -106,6 +106,10 @@ body,
 
 .expression-speak #mouth {
   animation: pet-mouth-talk 360ms ease-in-out infinite;
+}
+
+.pet-shell[data-action="wave"] #arm-right-motion {
+  animation: pet-wave 1.6s ease-in-out 1;
 }
 
 @keyframes pet-breathe {
@@ -179,6 +183,31 @@ body,
   }
 }
 
+@keyframes pet-wave {
+  0%,
+  100% {
+    transform: rotate(0.8deg);
+  }
+  18% {
+    transform: rotate(-106deg);
+  }
+  32% {
+    transform: rotate(-90deg);
+  }
+  46% {
+    transform: rotate(-112deg);
+  }
+  60% {
+    transform: rotate(-90deg);
+  }
+  74% {
+    transform: rotate(-112deg);
+  }
+  86% {
+    transform: rotate(-104deg);
+  }
+}
+
 @keyframes pet-mouth-talk {
   0%,
   100% {
@@ -194,7 +223,7 @@ body,
   .pet-shell:not(.is-sleeping) #hair-tail-left,
   .pet-shell:not(.is-sleeping) #hair-tail-right,
   .pet-shell:not(.is-sleeping) #arm-left,
-  .pet-shell:not(.is-sleeping) #arm-right,
+  .pet-shell:not(.is-sleeping) #arm-right-motion,
   .pet-shell:not(.is-sleeping) #tie,
   .expression-speak #mouth {
     animation: none;

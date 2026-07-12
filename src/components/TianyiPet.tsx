@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import TianyiArtwork, { type PetExpression } from "./TianyiArtwork";
+import TianyiArtwork, {
+  type PetAction,
+  type PetExpression,
+} from "./TianyiArtwork";
 
 // 天依的核心动画状态
 type PetState = "idle" | "blink" | "listen" | "speak" | "sleep" | "drag";
@@ -21,10 +24,13 @@ const getExpression = (state: PetState): PetExpression => {
 
 const TianyiPet = () => {
   const [state, setState] = useState<PetState>("idle");
+  const [action, setAction] = useState<PetAction>("none");
   const [isDragging, setIsDragging] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const petElement = useRef<HTMLDivElement>(null);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
   const restoreStateTimer = useRef<number | undefined>(undefined);
 
   // idle 动画循环 — 随机眨眼，并在短暂动作结束后恢复原状态。
@@ -108,8 +114,11 @@ const TianyiPet = () => {
 
   // 当前仍是 WebView 内部拖拽；原生窗口拖拽将在窗口交互任务中实现。
   const handleMouseDown = (event: React.MouseEvent) => {
+    setAction("none");
     setIsDragging(true);
     setState("drag");
+    hasDragged.current = false;
+    dragStart.current = { x: event.clientX, y: event.clientY };
     setOffset({
       x: event.clientX - position.x,
       y: event.clientY - position.y,
@@ -120,6 +129,14 @@ const TianyiPet = () => {
     if (!isDragging) return;
 
     const handleMove = (event: MouseEvent) => {
+      if (
+        Math.hypot(
+          event.clientX - dragStart.current.x,
+          event.clientY - dragStart.current.y,
+        ) > 4
+      ) {
+        hasDragged.current = true;
+      }
       setPosition({
         x: event.clientX - offset.x,
         y: event.clientY - offset.y,
@@ -138,18 +155,50 @@ const TianyiPet = () => {
     };
   }, [isDragging, offset]);
 
+  const triggerWave = () => {
+    if (hasDragged.current) return;
+    setAction("wave");
+  };
+
+  const handleClick = () => {
+    if (hasDragged.current) {
+      hasDragged.current = false;
+      return;
+    }
+    triggerWave();
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    triggerWave();
+  };
+
+  const handleAnimationEnd = (event: React.AnimationEvent) => {
+    if (event.animationName === "pet-wave") {
+      setAction("none");
+    }
+  };
+
   return (
     <div
       ref={petElement}
+      aria-label="让小洛宝招手"
       className={`pet-shell${state === "sleep" ? " is-sleeping" : ""}`}
+      data-action={action}
+      onAnimationEnd={handleAnimationEnd}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
       onMouseDown={handleMouseDown}
+      role="button"
       style={{
         left: position.x,
         top: position.y,
         cursor: isDragging ? "grabbing" : "grab",
       }}
+      tabIndex={0}
     >
-      <TianyiArtwork expression={getExpression(state)} />
+      <TianyiArtwork action={action} expression={getExpression(state)} />
     </div>
   );
 };
