@@ -16,6 +16,9 @@ body,
 .pet-shell {
   --eye-x: 0px;
   --eye-y: 0px;
+  /* 招手时允许手臂像纸片关节一样与身体分离，优先调整这两个值。 */
+  --wave-out-x: 2px;
+  --wave-lift-y: -0.4px;
 
   position: absolute;
   width: 200px;
@@ -186,25 +189,31 @@ body,
 @keyframes pet-wave {
   0%,
   100% {
-    transform: rotate(0.8deg);
+    transform: translate(0, 0) rotate(0.8deg);
+  }
+  8% {
+    transform: translate(2px, -1px) rotate(-18deg);
   }
   18% {
-    transform: rotate(-106deg);
+    transform: translate(var(--wave-out-x), var(--wave-lift-y)) rotate(-106deg);
   }
   32% {
-    transform: rotate(-90deg);
+    transform: translate(var(--wave-out-x), var(--wave-lift-y)) rotate(-90deg);
   }
   46% {
-    transform: rotate(-112deg);
+    transform: translate(var(--wave-out-x), var(--wave-lift-y)) rotate(-112deg);
   }
   60% {
-    transform: rotate(-90deg);
+    transform: translate(var(--wave-out-x), var(--wave-lift-y)) rotate(-90deg);
   }
   74% {
-    transform: rotate(-112deg);
+    transform: translate(var(--wave-out-x), var(--wave-lift-y)) rotate(-112deg);
   }
   86% {
-    transform: rotate(-104deg);
+    transform: translate(var(--wave-out-x), var(--wave-lift-y)) rotate(-104deg);
+  }
+  94% {
+    transform: translate(2px, -1px) rotate(-12deg);
   }
 }
 
