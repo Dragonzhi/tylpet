@@ -19,8 +19,8 @@
 | 层 | 技术 | 说明 |
 |---|---|---|
 | 桌面壳 | **Tauri v2** | Rust 后端 + 系统 WebView，5MB 二进制 |
-| 前端框架 | **React 18 + TypeScript** | |
-| 构建工具 | **Vite 6** | |
+| 前端框架 | **React 19 + TypeScript 5.8** | 以 `package.json` 与实际安装版本为准 |
+| 构建工具 | **Vite 7** | 以 `package.json` 与实际安装版本为准 |
 | 角色渲染 | **SVG (内联)** | 纯矢量，代码可控，无额外依赖 |
 | Rust 版本 | **1.97.0** | |
 | Node 版本 | **22.20.0** | |
@@ -31,11 +31,11 @@
 
 ### 已实现
 - [x] Tauri v2 透明无边框窗口（AlwaysOnTop + skipTaskbar + 点击穿透）
-- [x] SVG 天依矢量角色（头/身/发/蝴蝶结/四肢独立部件）
+- [x] SVG 临时天依矢量角色（头/身/发/蝴蝶结/四肢独立部件）
 - [x] 状态机骨架（6 种状态：idle / blink / listen / speak / sleep / drag）
 - [x] 呼吸动画（身体随正弦波上下浮动 + 手臂摆动）
 - [x] 随机眨眼（3-5 秒间隔）
-- [x] 鼠标拖拽（任意位置拖放）
+- [x] 鼠标拖拽（任意位置拖放，但是窗口小，不能拖到窗口外）
 - [x] Git 初始化 + 首次提交
 - [x] `.gitignore` 覆盖 target/node_modules/dist
 - [x] cargo 中科大镜像源配置
@@ -193,3 +193,4 @@ registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
 4. 首次 `npm run tauri dev` 的 `cargo build` 需要较长时间（下载几百个 crates），后续增量编译很快
 5. 项目不需要 Git LFS（当前无大文件），将来加音频时再配置
 6. `decorations: false` 会失去窗口标题栏，拖拽已由前端 JS 实现
+7. npm 依赖使用宽松的 semver 范围，且根目录 `.gitignore` 当前忽略了 `package-lock.json`，不同机器执行 `npm install` 可能得到不同的小版本。排查依赖或构建问题时，先记录 `node --version` 和 `npm ls --depth=0`
