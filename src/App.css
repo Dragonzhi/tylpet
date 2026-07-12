@@ -1,6 +1,120 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body, #root {
-  width: 100%; height: 100%;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background: transparent;
+}
+
+.pet-shell {
+  position: absolute;
+  width: 200px;
+  height: 340px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.tianyi-artwork {
+  display: block;
+  width: 200px;
+  height: 340px;
+  overflow: visible;
+  filter: drop-shadow(0 5px 5px rgb(42 53 80 / 18%));
+}
+
+.tianyi-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pet-breathe {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: pet-breathe 3.2s ease-in-out infinite;
+}
+
+.pet-shell:not(.is-sleeping) #hair-tail-left,
+.pet-shell:not(.is-sleeping) #hair-tail-right {
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+
+.pet-shell:not(.is-sleeping) #hair-tail-left {
+  animation: pet-hair-sway-left 4.4s ease-in-out infinite;
+}
+
+.pet-shell:not(.is-sleeping) #hair-tail-right {
+  animation: pet-hair-sway-right 4.4s ease-in-out infinite;
+}
+
+.expression-blink #eye-left,
+.expression-blink #eye-right,
+.expression-sleep #eye-left,
+.expression-sleep #eye-right {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(0.12);
+}
+
+.expression-speak #mouth {
+  animation: pet-mouth-talk 360ms ease-in-out infinite;
+}
+
+@keyframes pet-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-2px) scaleY(1.006);
+  }
+}
+
+@keyframes pet-hair-sway-left {
+  0%,
+  100% {
+    transform: rotate(-1.2deg);
+  }
+  50% {
+    transform: rotate(1.2deg);
+  }
+}
+
+@keyframes pet-hair-sway-right {
+  0%,
+  100% {
+    transform: rotate(1.2deg);
+  }
+  50% {
+    transform: rotate(-1.2deg);
+  }
+}
+
+@keyframes pet-mouth-talk {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-breathe,
+  .pet-shell:not(.is-sleeping) #hair-tail-left,
+  .pet-shell:not(.is-sleeping) #hair-tail-right,
+  .expression-speak #mouth {
+    animation: none;
+  }
 }
