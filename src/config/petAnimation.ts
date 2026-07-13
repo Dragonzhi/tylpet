@@ -12,12 +12,22 @@ export const PET_ANIMATION_CONFIG = {
     eyebrow: { maxOffsetX: 0.28, maxOffsetY: 0.2 },
     mouth: { maxOffsetX: 0.14, maxOffsetY: 0.1 },
     rouge: { maxOffsetX: 0.1, maxOffsetY: 0.07 },
-    // 头部探出幅度最大；旋转中心使用 SVG 中的 pivot_head。
-    head: { maxOffsetX: 1.8, maxOffsetY: 1.1, maxRotateDeg: 2.2 },
+    // 头部探出幅度最大；上下独立配置，旋转中心使用 SVG 中的 pivot_head。
+    head: {
+      maxOffsetX: 1.8,
+      maxOffsetUp: 0.55,
+      maxOffsetDown: 0.8,
+      maxRotateDeg: 2.2,
+    },
     // 身体只做克制的倾斜，双腿始终固定不参与跟随。
     body: { maxOffsetX: 0.55, maxOffsetY: 0.3, maxRotateDeg: 0.75 },
-    // 双臂使用动作外层跟随，不会覆盖招手和待机摆动。
-    arm: { maxOffsetX: 0.7, maxOffsetY: 0.38, maxRotateDeg: 0.45 },
+    // 双臂使用动作外层跟随；leftRestOffsetY 用于校准素材的静态高度差。
+    arm: {
+      maxOffsetX: 0.7,
+      maxOffsetY: 0.38,
+      maxRotateDeg: 0.45,
+      leftRestOffsetY: -0.35,
+    },
     // 马尾的鼠标视差；拖动惯性会在此基础上继续叠加。
     hairTail: { maxOffsetX: 0.9, maxOffsetY: 0.5, maxRotateDeg: 1 },
   },

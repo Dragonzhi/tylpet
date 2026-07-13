@@ -1,6 +1,5 @@
 import artworkSource from "../assets/小洛宝.svg?raw";
-import { memo, useEffect, useLayoutEffect, useRef } from "react";
-import { PET_ANIMATION_CONFIG } from "../config/petAnimation";
+import { memo, useLayoutEffect, useRef } from "react";
 
 export type PetExpression = "normal" | "blink" | "speak" | "sleep";
 export type PetAction = "none" | "wave";
@@ -147,6 +146,40 @@ const TianyiArtwork = ({ expression, action }: TianyiArtworkProps) => {
     const leftEarMotion = wrapLayer(leftEar, "ear-left-motion");
     const rightEarMotion = wrapLayer(rightEar, "ear-right-motion");
 
+    const measurementRestores: Array<() => void> = [];
+    const overrideForMeasurement = (
+      element: SVGElement | null | undefined,
+      property: string,
+      value: string,
+    ) => {
+      if (!element) return;
+      const previousValue = element.style.getPropertyValue(property);
+      const previousPriority = element.style.getPropertyPriority(property);
+      element.style.setProperty(property, value, "important");
+      measurementRestores.push(() => {
+        if (previousValue) {
+          element.style.setProperty(property, previousValue, previousPriority);
+        } else {
+          element.style.removeProperty(property);
+        }
+      });
+    };
+
+    // HMR 时 CSS 变量仍保留着当前姿态；测量轴心前必须回到素材原始坐标。
+    for (const followLayer of [
+      follow,
+      foregroundFollow,
+      leftArmFollow?.wrapper,
+    ]) {
+      overrideForMeasurement(followLayer, "translate", "0px");
+      overrideForMeasurement(followLayer, "rotate", "0deg");
+      overrideForMeasurement(followLayer, "transition", "none");
+    }
+    overrideForMeasurement(leftArm, "animation", "none");
+    overrideForMeasurement(leftArm, "transform", "none");
+    overrideForMeasurement(head, "transition", "none");
+    overrideForMeasurement(head, "transform", "none");
+
     // motion 是 character 的子节点，因此 pivot 必须换算到相同的父级坐标系。
     const pivotBounds = pivot.getBBox();
     const pivotPoint = svg.createSVGPoint();
@@ -220,6 +253,7 @@ const TianyiArtwork = ({ expression, action }: TianyiArtworkProps) => {
         head.style.transformOrigin = `${originX}% ${originY}%`;
       }
     }
+    measurementRestores.reverse().forEach((restore) => restore());
 
     return () => {
       // 相邻图层必须逆序还原：左耳的 nextSibling 是仍在外壳里的右耳。
@@ -233,58 +267,6 @@ const TianyiArtwork = ({ expression, action }: TianyiArtworkProps) => {
       foreground.remove();
     };
   }, [artworkMarkup]);
-
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    const host = artworkElement.current;
-    const leftEar = host?.querySelector<SVGGElement>("#ear-left-motion");
-    const rightEar = host?.querySelector<SVGGElement>("#ear-right-motion");
-    if (!leftEar || !rightEar) return;
-
-    const config = PET_ANIMATION_CONFIG.earTwitch;
-    let timer: number | undefined;
-    let animations: Animation[] = [];
-
-    const animateEar = (ear: SVGGElement, direction: -1 | 1) =>
-      ear.animate(
-        [
-          { translate: "0 0", rotate: "0deg", offset: 0 },
-          {
-            translate: `0 ${-config.maxLiftPx}px`,
-            rotate: `${direction * config.maxRotateDeg}deg`,
-            offset: 0.3,
-          },
-          {
-            translate: `0 ${-config.maxLiftPx * 0.25}px`,
-            rotate: `${direction * config.maxRotateDeg * -0.35}deg`,
-            offset: 0.62,
-          },
-          { translate: "0 0", rotate: "0deg", offset: 1 },
-        ],
-        {
-          duration: config.durationMs,
-          easing: "ease-in-out",
-        },
-      );
-
-    const schedule = () => {
-      const delay =
-        config.minDelayMs +
-        Math.random() * (config.maxDelayMs - config.minDelayMs);
-      timer = window.setTimeout(() => {
-        animations.forEach((animation) => animation.cancel());
-        animations = [animateEar(leftEar, -1), animateEar(rightEar, 1)];
-        schedule();
-      }, delay);
-    };
-
-    schedule();
-    return () => {
-      if (timer !== undefined) window.clearTimeout(timer);
-      animations.forEach((animation) => animation.cancel());
-    };
-  }, []);
 
   return (
     <div

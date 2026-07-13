@@ -19,12 +19,17 @@ export const usePointerFollow = (
   const winPosRef = useRef({ x: 0, y: 0 });
   const petElementRef = useRef(petElement);
   petElementRef.current = petElement;
+  const config = PET_ANIMATION_CONFIG.pointerFollow;
 
   useEffect(() => {
-    const config = PET_ANIMATION_CONFIG.pointerFollow;
     let animationFrame: number | undefined;
     let pointerX = 0;
     let pointerY = 0;
+
+    petElementRef.current.current?.style.setProperty(
+      "--arm-left-rest-y",
+      px(config.arm.leftRestOffsetY),
+    );
 
     const updatePosition = () => {
       animationFrame = undefined;
@@ -66,7 +71,15 @@ export const usePointerFollow = (
       set("--rouge-x", px(directionX * config.rouge.maxOffsetX));
       set("--rouge-y", px(directionY * config.rouge.maxOffsetY));
       set("--head-x", px(directionX * config.head.maxOffsetX));
-      set("--head-y", px(directionY * config.head.maxOffsetY));
+      set(
+        "--head-y",
+        px(
+          directionY *
+            (directionY < 0
+              ? config.head.maxOffsetUp
+              : config.head.maxOffsetDown),
+        ),
+      );
       set("--head-rotate", deg(directionX * config.head.maxRotateDeg));
       set("--body-x", px(directionX * config.body.maxOffsetX));
       set("--body-y", px(directionY * config.body.maxOffsetY));
@@ -136,7 +149,60 @@ export const usePointerFollow = (
         window.cancelAnimationFrame(animationFrame);
       }
     };
-  }, [petElement, mode]);
+  }, [petElement, mode, config]);
+};
+
+export const useEarTwitch = (petElement: PetElementRef) => {
+  const config = PET_ANIMATION_CONFIG.earTwitch;
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const leftEar =
+      petElement.current?.querySelector<SVGGElement>("#ear-left-motion");
+    const rightEar =
+      petElement.current?.querySelector<SVGGElement>("#ear-right-motion");
+    if (!leftEar || !rightEar) return;
+
+    let timer: number | undefined;
+    let animations: Animation[] = [];
+
+    const animateEar = (ear: SVGGElement, direction: -1 | 1) =>
+      ear.animate(
+        [
+          { translate: "0 0", rotate: "0deg", offset: 0 },
+          {
+            translate: `0 ${-config.maxLiftPx}px`,
+            rotate: `${direction * config.maxRotateDeg}deg`,
+            offset: 0.3,
+          },
+          {
+            translate: `0 ${-config.maxLiftPx * 0.25}px`,
+            rotate: `${direction * config.maxRotateDeg * -0.35}deg`,
+            offset: 0.62,
+          },
+          { translate: "0 0", rotate: "0deg", offset: 1 },
+        ],
+        { duration: config.durationMs, easing: "ease-in-out" },
+      );
+
+    const schedule = () => {
+      const delay =
+        config.minDelayMs +
+        Math.random() * (config.maxDelayMs - config.minDelayMs);
+      timer = window.setTimeout(() => {
+        animations.forEach((animation) => animation.cancel());
+        animations = [animateEar(leftEar, -1), animateEar(rightEar, 1)];
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      animations.forEach((animation) => animation.cancel());
+    };
+  }, [petElement, config]);
 };
 
 interface SpringAxis {
