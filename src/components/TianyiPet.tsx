@@ -21,6 +21,11 @@ import {
 // 天依的核心动画状态
 type PetState = "idle" | "blink" | "listen" | "speak" | "sleep" | "drag";
 
+interface ContextMenuPosition {
+  x: number;
+  y: number;
+}
+
 const getExpression = (state: PetState): PetExpression => {
   if (state === "blink") return "blink";
   if (state === "speak") return "speak";
@@ -31,7 +36,9 @@ const getExpression = (state: PetState): PetExpression => {
 const TianyiPet = () => {
   const [state, setState] = useState<PetState>("idle");
   const [action, setAction] = useState<PetAction>("none");
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const petElement = useRef<HTMLDivElement>(null);
+  const contextMenuOpenRef = useRef(false);
   const hasDragged = useRef(false);
   const restoreStateTimer = useRef<number | undefined>(undefined);
   usePointerFollow(petElement, "global");
@@ -48,7 +55,8 @@ const TianyiPet = () => {
   );
   const windowDrag = useWindowDrag({ onEnd: handleWindowDragEnd });
   useClickThrough(petElement, {
-    forceInteractive: state === "drag" || windowDrag.isDragging,
+    forceInteractive:
+      state === "drag" || windowDrag.isDragging || contextMenuOpen,
   });
 
   // idle 动画循环 — 随机眨眼，并在短暂动作结束后恢复原状态。
@@ -107,9 +115,28 @@ const TianyiPet = () => {
     }
   };
 
+  const showContextMenu = useCallback(
+    async (position: ContextMenuPosition) => {
+      if (contextMenuOpenRef.current) return;
+      contextMenuOpenRef.current = true;
+      setContextMenuOpen(true);
+
+      try {
+        await invoke("show_context_menu", { position });
+      } catch (error) {
+        console.error("打开右键菜单失败:", error);
+      } finally {
+        contextMenuOpenRef.current = false;
+        setContextMenuOpen(false);
+      }
+    },
+    [],
+  );
+
   const handleContextMenu = (event: React.MouseEvent) => {
     event.preventDefault();
-    // Context menu is handled by Tauri native menu at cursor position
+    event.stopPropagation();
+    void showContextMenu({ x: event.clientX, y: event.clientY });
   };
 
   const triggerWave = () => {
@@ -126,6 +153,22 @@ const TianyiPet = () => {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    const opensContextMenu =
+      event.key === "ContextMenu" ||
+      (event.shiftKey && event.key === "F10");
+    if (opensContextMenu) {
+      event.preventDefault();
+      event.stopPropagation();
+      const bounds = petElement.current?.getBoundingClientRect();
+      if (bounds) {
+        void showContextMenu({
+          x: bounds.left + bounds.width / 2,
+          y: bounds.top + bounds.height / 2,
+        });
+      }
+      return;
+    }
+
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     triggerWave();
@@ -140,7 +183,7 @@ const TianyiPet = () => {
   return (
     <div
       ref={petElement}
-      aria-label="让小洛宝招手"
+      aria-label="小洛宝，按回车招手，按菜单键打开菜单"
       className={`pet-shell${state === "sleep" ? " is-sleeping" : ""}`}
       data-action={action}
       onAnimationEnd={handleAnimationEnd}
