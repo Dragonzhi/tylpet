@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::Deserialize;
+use std::fs;
 use std::sync::OnceLock;
 use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuEvent, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -166,6 +167,66 @@ async fn get_work_area(window: tauri::Window) -> Result<WorkArea, String> {
     })
 }
 
+#[tauri::command]
+async fn load_settings(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let path = dir.join("settings.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    match fs::read_to_string(&path) {
+        Ok(content) => Ok(Some(content)),
+        Err(e) => {
+            eprintln!("读取设置文件失败: {e}");
+            Ok(None)
+        }
+    }
+}
+
+#[tauri::command]
+async fn save_settings(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("settings.json");
+    let tmp_path = dir.join("settings.json.tmp");
+    fs::write(&tmp_path, &json).map_err(|e| e.to_string())?;
+    fs::rename(&tmp_path, &path).map_err(|e| {
+        let _ = fs::remove_file(&tmp_path);
+        e.to_string()
+    })?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn load_secrets(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let path = dir.join("secrets.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    match fs::read_to_string(&path) {
+        Ok(content) => Ok(Some(content)),
+        Err(e) => {
+            eprintln!("读取密钥文件失败: {e}");
+            Ok(None)
+        }
+    }
+}
+
+#[tauri::command]
+async fn save_secrets(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("secrets.json");
+    let tmp_path = dir.join("secrets.json.tmp");
+    fs::write(&tmp_path, &json).map_err(|e| e.to_string())?;
+    fs::rename(&tmp_path, &path).map_err(|e| {
+        let _ = fs::remove_file(&tmp_path);
+        e.to_string()
+    })?;
+    Ok(())
+}
+
 fn handle_window_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
     let Some(action) = window_menu_action(event.id().as_ref()) else {
         return;
@@ -263,7 +324,11 @@ pub fn run() {
             start_dragging,
             close_window,
             show_context_menu,
-            get_work_area
+            get_work_area,
+            load_settings,
+            save_settings,
+            load_secrets,
+            save_secrets
         ])
         .setup(|app| {
             create_tray(app)?;

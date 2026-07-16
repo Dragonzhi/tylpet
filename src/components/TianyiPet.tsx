@@ -16,6 +16,7 @@ import {
   PetRuntimeProvider,
   usePetRuntime,
 } from "../hooks/usePetRuntime";
+import { useSettings } from "../hooks/useSettings";
 import { PET_INTERACTION_CONFIG } from "../config/petInteraction";
 import {
   distanceBetweenPoints,
@@ -87,6 +88,7 @@ const TianyiPetInnerContent = ({
   const restoreStateTimer = useRef<number | undefined>(undefined);
 
   const { scheduler } = usePetRuntime();
+  const { updateWindowPosition } = useSettings();
 
   // Keep hooks as-is
   usePointerFollow(petElement, "global");
@@ -94,15 +96,27 @@ const TianyiPetInnerContent = ({
   const { beginDrag: beginHairDrag, endDrag: endHairDrag } =
     useHairMotion(petElement);
 
-  // --- Drag end handler: now also resumes agent actions ---
+  // --- Drag end handler: resume agent actions and persist window position ---
   const handleWindowDragEnd = useCallback(
     (didDrag: boolean) => {
       hasDragged.current = didDrag;
       endHairDrag();
       setState("idle");
       scheduler.resumeAgentActions();
+
+      // Persist window position after drag
+      if (didDrag) {
+        void (async () => {
+          try {
+            const pos = await getCurrentWindow().outerPosition();
+            updateWindowPosition(pos.x, pos.y);
+          } catch {
+            // 位置获取失败不影响交互
+          }
+        })();
+      }
     },
-    [endHairDrag, scheduler],
+    [endHairDrag, scheduler, updateWindowPosition],
   );
   const windowDrag = useWindowDrag({ onEnd: handleWindowDragEnd });
   useClickThrough(petElement, {
