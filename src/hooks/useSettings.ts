@@ -34,6 +34,13 @@ export function useSettings() {
 
       const win = getCurrentWindow();
 
+      // 应用窗口外观设置
+      try {
+        await win.setAlwaysOnTop(loaded.window.alwaysOnTop);
+      } catch {
+        // 设置失败不影响启动
+      }
+
       // 恢复窗口位置；没有保存位置时居中
       if (hasSavedPosition(loaded)) {
         const restored = await storeRef.current!.restoreWindowPosition(loaded);

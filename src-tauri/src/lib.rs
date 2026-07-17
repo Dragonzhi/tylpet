@@ -4,7 +4,7 @@ use std::fs;
 use std::sync::OnceLock;
 use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuEvent, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Emitter, LogicalPosition, Manager};
+use tauri::{Emitter, LogicalPosition, Manager, WebviewUrl};
 use windows::Win32::Foundation::{LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
@@ -20,6 +20,9 @@ const MENU_TOGGLE_ALWAYS_ON_TOP: &str = "toggle-always-on-top";
 const MENU_CENTER_WINDOW: &str = "center-window";
 const MENU_SHOW_WINDOW: &str = "show-window";
 const MENU_EXIT: &str = "exit";
+const MENU_OPEN_SETTINGS: &str = "open-settings";
+const MENU_TOGGLE_AGENT: &str = "toggle-agent";
+const MENU_STOP_ALL: &str = "stop-all";
 const TRAY_ID: &str = "main-tray";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -227,15 +230,59 @@ async fn save_secrets(app: tauri::AppHandle, json: String) -> Result<(), String>
     Ok(())
 }
 
+#[tauri::command]
+fn stop_all_behaviors() -> Result<(), String> {
+    // 前端调度器在收到此命令的事件后会处理
+    Ok(())
+}
+
+#[tauri::command]
+async fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("settings") {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+    } else {
+        tauri::WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
+            .title("小洛宝设置")
+            .inner_size(480.0, 520.0)
+            .resizable(true)
+            .build()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn handle_window_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
-    let Some(action) = window_menu_action(event.id().as_ref()) else {
+    let id = event.id().as_ref();
+
+    match id {
+        MENU_EXIT => {
+            app.exit(0);
+            return;
+        }
+        MENU_OPEN_SETTINGS => {
+            if let Some(window) = app.get_webview_window("settings") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            } else {
+                let _ = tauri::WebviewWindowBuilder::new(
+                    app,
+                    "settings",
+                    WebviewUrl::App("settings.html".into()),
+                )
+                .title("小洛宝设置")
+                .inner_size(480.0, 520.0)
+                .resizable(true)
+                .build();
+            }
+            return;
+        }
+        _ => {}
+    }
+
+    let Some(action) = window_menu_action(id) else {
         return;
     };
-
-    if action == WindowMenuAction::Exit {
-        app.exit(0);
-        return;
-    }
 
     let Some(window) = app.get_webview_window("main") else {
         eprintln!("无法处理菜单：主窗口不存在");
@@ -271,11 +318,16 @@ fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     let show_item = MenuItemBuilder::new("显示小洛宝")
         .id(MENU_SHOW_WINDOW)
         .build(app)?;
+    let settings_item = MenuItemBuilder::new("设置")
+        .id(MENU_OPEN_SETTINGS)
+        .build(app)?;
     let exit_item = MenuItemBuilder::new("退出小洛宝")
         .id(MENU_EXIT)
         .build(app)?;
     let menu = MenuBuilder::new(app)
         .item(&show_item)
+        .separator()
+        .item(&settings_item)
         .separator()
         .item(&exit_item)
         .build()?;
@@ -328,7 +380,9 @@ pub fn run() {
             load_settings,
             save_settings,
             load_secrets,
-            save_secrets
+            save_secrets,
+            open_settings,
+            stop_all_behaviors
         ])
         .setup(|app| {
             create_tray(app)?;
