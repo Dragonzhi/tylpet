@@ -30,6 +30,7 @@ src-tauri/release/
 
 # npm / node
 package-lock.json
+!tools/motion-editor/package-lock.json
 
 # OS
 Thumbs.db

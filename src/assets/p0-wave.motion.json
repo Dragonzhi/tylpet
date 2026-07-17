@@ -1,0 +1,32 @@
+{
+  "experimentalSchema": "m8-p0@1",
+  "productionReady": false,
+  "sourceFingerprint": "4386f8841a89c4a814439b59bc294595e97a297e14ddd444415b640f4afffcc3",
+  "clip": {
+    "id": "p0-wave",
+    "partId": "arm_right",
+    "fps": 24,
+    "durationFrames": 24,
+    "pivot": {
+      "x": 0,
+      "y": 0
+    },
+    "keyframes": [
+      {
+        "frame": 0,
+        "rotation": 0,
+        "easing": "easeInOut"
+      },
+      {
+        "frame": 12,
+        "rotation": -55,
+        "easing": "easeInOut"
+      },
+      {
+        "frame": 24,
+        "rotation": 0,
+        "easing": "easeInOut"
+      }
+    ]
+  }
+}

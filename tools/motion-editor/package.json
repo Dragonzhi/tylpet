@@ -1,0 +1,26 @@
+{
+  "name": "ltypet-motion-editor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 1430 --strictPort",
+    "build": "tsc && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@svgedit/svgcanvas": "7.4.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "4.7.0",
+    "jsdom": "29.1.1",
+    "typescript": "5.8.3",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
+  }
+}

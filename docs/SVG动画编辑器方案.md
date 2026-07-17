@@ -5,6 +5,8 @@
 > 决策日期：2026-07-16
 >
 > 上位计划：[`计划.md`](../计划.md) M8
+>
+> P0 可执行步骤：[`M8-P0实施手册.md`](./M8-P0实施手册.md)
 
 ## 1. 决策摘要
 
@@ -256,6 +258,7 @@ interface CharacterRig {
 
 interface RigPart {
   id: string;
+  // 当前 artwork 内的绑定，不是跨服装共享的语义身份。
   sourceElementId: string;
   logicalParentId: string | null;
   defaultRenderSlot: string;
@@ -282,6 +285,13 @@ interface TransformValue {
   opacity: number;
 }
 ```
+
+`RigPart.id` 是动作、编辑器和不同服装共享的语义 Part ID，例如
+`arm_right`；`sourceElementId` 只是某一份 artwork 内定位源节点的绑定，例如
+当前素材中的 `layer21`，不同服装可以不同。导入器可优先从唯一的
+`inkscape:label` 得到语义 ID，再解析并记录当前 DOM ID。P0 不要求修改源 SVG
+加入 `data-part`；是否在派生的运行时 artwork 中生成 `data-part`，由 P1 的绑定
+格式验证后再决定。
 
 ### 8.2 Motion 草案
 
@@ -379,7 +389,10 @@ interface MotionEvent {
 
 ## 10. SVG 导入与安全边界
 
-导入是首个决策门。不能假设 SVG-edit 能无损处理现有素材，必须用 `src/assets/小洛宝.svg` 做往返验证。
+导入是首个决策门。P0 默认使用已烘焙复杂 transform 的
+`src/assets/小洛宝.glax.svg` 作为编辑器输入，同时保留
+`src/assets/小洛宝.svg` 作为 Inkscape 美术源和视觉/结构对照。不能因为派生版本
+更容易导入，就跳过两者差异和派生过程可复现性的验证。
 
 导入流程：
 
@@ -463,7 +476,7 @@ await renderer.playMotion("wave", {
 目标：证明现有素材能被可靠导入、选中、变换和保存动画数据。
 
 - [ ] 建立独立编辑器 workspace，固定 SVG-edit/svgcanvas 精确版本。
-- [ ] 打开 `小洛宝.svg` 并生成导入诊断。
+- [ ] 打开 `小洛宝.glax.svg` 并生成导入诊断，同时对原始 `小洛宝.svg` 运行对照诊断。
 - [ ] 验证 ID、分组、pivot 和视觉往返。
 - [ ] 选中 `arm_right`，在两个时间点旋转并插值预览。
 - [ ] 输出最小 motion JSON，不修改生产 SVG。
@@ -537,7 +550,7 @@ await renderer.playMotion("wave", {
 ### 真实编辑器验收
 
 - 100%、150% 和 200% DPI 下选择框与鼠标位置一致。
-- 导入 `小洛宝.svg` 后无部件错位。
+- 导入 `小洛宝.glax.svg` 后无部件错位，并记录它与原始 `小洛宝.svg` 的视觉差异。
 - Pivot 拖动后旋转中心稳定，撤销和重开项目后不漂移。
 - 拖动播放头时舞台无明显停顿或历史状态泄漏。
 - 关键帧密集时仍能选择、移动和撤销。

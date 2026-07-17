@@ -18,6 +18,10 @@ export default defineConfig(async () => ({
     },
   },
 
+  test: {
+    exclude: ["tools/**", "node_modules/**", "src-tauri/**"],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
