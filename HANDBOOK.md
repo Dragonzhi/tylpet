@@ -35,6 +35,7 @@
 - Windows 原生右键菜单：切换始终置顶、回到当前显示器中央、退出小洛宝。
 - Windows 托盘提供“显示小洛宝”和“退出小洛宝”的最小安全入口；左键托盘图标可恢复主窗口。
 - `ContextMenu`、`Shift+F10` 和 `Ctrl+Shift+Q` 键盘路径。
+- 独立的 Flash 风格 SVG Animation Studio MVP：Part/pivot、Clip、时间轴、关键帧、缓动、层级槽位、预览、撤销和 canonical rig/motions 导入导出；尚未接入生产桌宠运行时。
 - Vitest 前端数学测试和 Rust 菜单/鼠标消息映射测试。
 
 ### 当前边界
@@ -51,7 +52,7 @@
 ### 角色与桌面体验
 
 - [ ] 更多短动作和状态：打哈欠、伸懒腰、听歌律动、表情反应。
-- [ ] 基于 SVG-edit/svgcanvas 的 Flash 风格 Animation Studio，用图层、pivot、时间轴和关键帧制作命名动作；完整方案见 [`docs/SVG动画编辑器方案.md`](./docs/SVG动画编辑器方案.md)。
+- [x] 基于 SVG-edit/svgcanvas 的 Flash 风格 Animation Studio MVP，可用图层、pivot、时间轴和关键帧制作命名动作；下一步是通过统一渲染器接入桌宠，完整方案见 [`docs/SVG动画编辑器方案.md`](./docs/SVG动画编辑器方案.md)。
 - [ ] 双击交互和轻量对话入口。
 - [ ] 音符、星光等克制的粒子效果，并提供减少动态效果降级。
 - [ ] 窗口边缘和任务栏吸附。

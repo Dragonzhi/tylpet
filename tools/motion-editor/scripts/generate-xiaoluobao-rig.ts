@@ -44,7 +44,11 @@ const parts: ImportedPartRef[] = inspection.parts.map((part) => {
     element: element as unknown as SVGElement,
     bindMatrix: [1, 0, 0, 1, 0, 0],
     originalTransform: null,
-    originalOpacity: element.getAttribute("opacity"),
+      originalOpacity: element.getAttribute("opacity"),
+      originalDisplay: element.getAttribute("display"),
+      sourceOrder: 0,
+      originalParent: element.parentNode,
+      originalNextSibling: element.nextSibling,
   };
 });
 

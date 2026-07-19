@@ -7,6 +7,7 @@ import {
   createWaveExample,
   firstPlayableTrack,
   parseMotionLibraryForRig,
+  parseRigForArtwork,
 } from "../src/project/v1Project";
 import type { ImportResult, ImportedPartRef } from "../src/svgcanvas/SvgCanvasAdapter";
 
@@ -25,6 +26,10 @@ function makePart(partId: string, pivot: { x: number; y: number }): {
       bindMatrix: [1, 0, 0, 1, 0, 0],
       originalTransform: null,
       originalOpacity: null,
+      originalDisplay: null,
+      sourceOrder: 0,
+      originalParent: element.parentNode,
+      originalNextSibling: element.nextSibling,
     },
     pivot: [partId, pivot],
   };
@@ -100,6 +105,24 @@ describe("P1 project lifecycle", () => {
     invalid.rigId = rig.rigId;
     invalid.clips[0].tracks[0].partId = "missing";
     expect(() => parseMotionLibraryForRig(JSON.stringify(invalid), rig)).toThrow("unknown-track-part");
+  });
+
+  it("round-trips a rig only for its exact artwork", () => {
+    const importedPart = makePart("arm_right", { x: 19, y: 35 });
+    const imported: ImportResult = {
+      parts: [importedPart.part],
+      pivotLocal: new Map([importedPart.pivot]),
+      viewBox: [0, 0, 33.790157, 53.378078],
+      diagnostics: [],
+    };
+    const artwork = {
+      source: "sample.svg",
+      fingerprint: "sha256:4386f8841a89c4a814439b59bc294595e97a297e14ddd444415b640f4afffcc3",
+    };
+    const rig = buildRigFromImport(imported, artwork);
+    expect(parseRigForArtwork(JSON.stringify(rig), imported, artwork)).toEqual(rig);
+    expect(() => parseRigForArtwork(JSON.stringify(rig), imported, { ...artwork, fingerprint: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }))
+      .toThrow("指纹不匹配");
   });
 });
 

@@ -4,7 +4,10 @@
  * No DOMMatrix, no external dependencies.
  */
 
-import type { AffineMatrix } from "../types.js";
+import type {
+  AffineMatrix,
+  TransformDecompositionResult,
+} from "../types.js";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -177,4 +180,65 @@ export function composeAroundPivot(
   result = multiply(t1, result);
 
   return result;
+}
+
+/**
+ * Decomposes an edited local matrix back into the authored channels used by
+ * `composeAroundPivot`. The bind matrix is removed first, so reflected or
+ * translated artwork does not leak into authored keyframes.
+ *
+ * The v1 motion format deliberately has no skew channel. Matrices containing
+ * skew are rejected instead of being approximated and drifting on round-trip.
+ */
+export function decomposeAuthoredTransform(
+  bindMatrix: AffineMatrix,
+  editedLocalMatrix: AffineMatrix,
+  pivot: { x: number; y: number },
+  tolerance = 1e-8,
+): TransformDecompositionResult {
+  if (
+    ![...bindMatrix, ...editedLocalMatrix, pivot.x, pivot.y, tolerance]
+      .every(Number.isFinite)
+  ) {
+    return { ok: false, reason: "non-finite" };
+  }
+
+  const inverseBind = invert(bindMatrix);
+  if (!inverseBind) return { ok: false, reason: "singular-bind" };
+
+  const authored = multiply(inverseBind, editedLocalMatrix);
+  const [a, b, c, d, e, f] = authored;
+  const scaleX = Math.hypot(a, b);
+  const secondColumnLength = Math.hypot(c, d);
+  if (scaleX < EPSILON || secondColumnLength < EPSILON) {
+    return { ok: false, reason: "singular-transform" };
+  }
+
+  const normalizedDot = (a * c + b * d) / (scaleX * secondColumnLength);
+  if (Math.abs(normalizedDot) > tolerance) {
+    return { ok: false, reason: "skew" };
+  }
+
+  const det = determinant(authored);
+  if (Math.abs(det) < EPSILON) return { ok: false, reason: "singular-transform" };
+
+  const scaleY = det / scaleX;
+  let rotation = Math.atan2(b, a) * 180 / Math.PI;
+  if (rotation > 180) rotation -= 360;
+  if (rotation <= -180) rotation += 360;
+
+  // e = x + px - a*px - c*py (and the equivalent equation for y).
+  const x = e - pivot.x + a * pivot.x + c * pivot.y;
+  const y = f - pivot.y + b * pivot.x + d * pivot.y;
+
+  const value = {
+    x: normalizeZero(x),
+    y: normalizeZero(y),
+    rotation: normalizeZero(rotation),
+    scaleX: normalizeZero(scaleX),
+    scaleY: normalizeZero(scaleY),
+  };
+  return Object.values(value).every(Number.isFinite)
+    ? { ok: true, value }
+    : { ok: false, reason: "non-finite" };
 }

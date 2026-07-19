@@ -7,6 +7,8 @@
 export type {
   AffineMatrix,
   TransformValue,
+  AuthoredTransformValue,
+  TransformDecompositionResult,
   EasingValue,
   ProceduralChannel,
   SourceBinding,
@@ -36,6 +38,7 @@ export {
   determinant,
   approximatelyEqual,
   composeAroundPivot,
+  decomposeAuthoredTransform,
   computePivotInPartLocal,
 } from "./math/index.js";
 

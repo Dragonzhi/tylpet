@@ -114,6 +114,51 @@ export function parseMotionLibraryForRig(
   return validation.value;
 }
 
+export function parseRigForArtwork(
+  text: string,
+  imported: ImportResult,
+  artwork: { source: string; fingerprint: string },
+): CharacterRigV1 {
+  let input: unknown;
+  try {
+    input = JSON.parse(text);
+  } catch (error: unknown) {
+    throw new Error(`JSON 解析失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+  const validation = validateRig(input);
+  if (!validation.ok) {
+    throw new Error(`Rig 文件校验失败：${formatValidationIssues(validation.issues)}`);
+  }
+  const rig = validation.value;
+  if (rig.artwork.fingerprint !== artwork.fingerprint) {
+    throw new Error(`Rig 素材指纹不匹配：期望 ${artwork.fingerprint}，实际 ${rig.artwork.fingerprint}`);
+  }
+  if (rig.artwork.source !== artwork.source) {
+    throw new Error(`Rig 素材来源不匹配：期望 ${artwork.source}，实际 ${rig.artwork.source}`);
+  }
+  if (rig.artwork.viewBox.some((value, index) => Math.abs(value - imported.viewBox[index]) > 1e-8)) {
+    throw new Error("Rig viewBox 与当前素材不匹配");
+  }
+  const importedParts = new Map(imported.parts.map((part) => [part.partId, part]));
+  for (const part of rig.parts) {
+    const source = importedParts.get(part.id);
+    if (!source) throw new Error(`Rig Part 在当前素材中不存在：${part.id}`);
+    if (
+      part.sourceBinding.kind === "inkscapeLabel" &&
+      part.sourceBinding.value !== source.inkscapeLabel
+    ) {
+      throw new Error(`Rig Part ${part.id} 的 inkscape:label binding 不匹配`);
+    }
+    if (
+      part.sourceBinding.kind === "elementId" &&
+      part.sourceBinding.value !== source.sourceElementId
+    ) {
+      throw new Error(`Rig Part ${part.id} 的 elementId binding 不匹配`);
+    }
+  }
+  return rig;
+}
+
 export function firstPlayableTrack(library: MotionLibraryV1): {
   clip: MotionClipV1;
   partId: string;

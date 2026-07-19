@@ -40,6 +40,19 @@ export interface TransformValue {
   opacity: number;
 }
 
+/** Numeric transform channels that can be represented without skew. */
+export interface AuthoredTransformValue {
+  x: number;
+  y: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+export type TransformDecompositionResult =
+  | { ok: true; value: AuthoredTransformValue }
+  | { ok: false; reason: "singular-bind" | "singular-transform" | "skew" | "non-finite" };
+
 // ─── Easing ─────────────────────────────────────────────────────
 
 /**
