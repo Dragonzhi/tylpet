@@ -60,6 +60,14 @@ export interface ProductionPublishPlan {
   targetDirectory: string;
   currentSignature: string;
   candidateSignature: string;
+  diff: ProductionPublishDiff;
+}
+
+export interface ProductionPublishDiff {
+  rigChanged: boolean;
+  addedClips: string[];
+  removedClips: string[];
+  changedClips: string[];
 }
 
 export interface MotionEditorHostError {

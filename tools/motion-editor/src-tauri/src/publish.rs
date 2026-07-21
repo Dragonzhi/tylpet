@@ -1,4 +1,6 @@
-use crate::models::{HostError, HostResult, ProjectSnapshot, PublishPlan, StoredPublishPlan};
+use crate::models::{
+    HostError, HostResult, ProjectSnapshot, PublishDiff, PublishPlan, StoredPublishPlan,
+};
 use crate::project_io::{document_signature, transactional_replace, validate_snapshot};
 use serde_json::Value;
 use std::fs;
@@ -55,17 +57,73 @@ pub fn prepare(snapshot: ProjectSnapshot) -> HostResult<StoredPublishPlan> {
     };
     let current_signature = document_signature(&current_snapshot)?;
     let candidate_signature = document_signature(&snapshot)?;
+    let diff = compute_diff(&current_snapshot, &snapshot);
     let plan = PublishPlan {
         plan_id: Uuid::new_v4().to_string(),
         target_directory: target.display().to_string(),
         current_signature,
         candidate_signature,
+        diff,
     };
     Ok(StoredPublishPlan {
         plan,
         snapshot,
         target,
     })
+}
+
+fn compute_diff(current: &ProjectSnapshot, candidate: &ProjectSnapshot) -> PublishDiff {
+    let current_clips = current
+        .motions
+        .get("clips")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let candidate_clips = candidate
+        .motions
+        .get("clips")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let clip_id = |clip: &Value| {
+        clip.get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+    let current_by_id = current_clips
+        .iter()
+        .map(|clip| (clip_id(clip), clip))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let candidate_by_id = candidate_clips
+        .iter()
+        .map(|clip| (clip_id(clip), clip))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let added_clips = candidate_by_id
+        .keys()
+        .filter(|id| !current_by_id.contains_key(*id))
+        .cloned()
+        .collect();
+    let removed_clips = current_by_id
+        .keys()
+        .filter(|id| !candidate_by_id.contains_key(*id))
+        .cloned()
+        .collect();
+    let changed_clips = candidate_by_id
+        .iter()
+        .filter(|(id, clip)| {
+            current_by_id
+                .get(*id)
+                .is_some_and(|current_clip| *current_clip != **clip)
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
+    PublishDiff {
+        rig_changed: current.rig != candidate.rig,
+        added_clips,
+        removed_clips,
+        changed_clips,
+    }
 }
 
 pub fn commit(stored: &StoredPublishPlan) -> HostResult<String> {

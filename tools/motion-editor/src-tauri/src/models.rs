@@ -112,6 +112,16 @@ pub struct PublishPlan {
     pub target_directory: String,
     pub current_signature: String,
     pub candidate_signature: String,
+    pub diff: PublishDiff,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishDiff {
+    pub rig_changed: bool,
+    pub added_clips: Vec<String>,
+    pub removed_clips: Vec<String>,
+    pub changed_clips: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
