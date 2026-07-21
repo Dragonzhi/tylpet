@@ -378,7 +378,6 @@ export class SvgCanvasAdapter implements StageAdapter {
     if (this.renderOrderAltered) this.restoreRenderOrder();
     this.partIndex.clear();
     this.pivotLocal.clear();
-    this.loadedBindingElementIds.clear();
     for (const [partId, ref] of nextIndex) this.partIndex.set(partId, ref);
     for (const [partId, pivot] of nextPivots) this.pivotLocal.set(partId, pivot);
     this.installStageSelection(root);
@@ -558,6 +557,7 @@ export class SvgCanvasAdapter implements StageAdapter {
     if (this.renderOrderAltered) this.restoreRenderOrder();
     this.partIndex.clear();
     this.pivotLocal.clear();
+    this.loadedBindingElementIds.clear();
     this.lockedParts.clear();
     this.selectionListener = null;
     this.container = null;

@@ -38,7 +38,6 @@ import type {
 import type { Diagnostic, ImportResult, PartScreenGeometry } from "./svgcanvas/SvgCanvasAdapter";
 import { SvgCanvasAdapter } from "./svgcanvas/SvgCanvasAdapter";
 import {
-  openV1Project,
   parseV1Project,
   parseMotionLibraryForRig,
   parseRigForArtwork,
@@ -306,26 +305,29 @@ export default function App() {
   ) => {
     const adapter = adapterRef.current;
     if (!adapter) throw new Error("画布尚未初始化");
-    await parseV1Project({
+    const opened = await parseV1Project({
       artwork: snapshot.artwork,
       artworkSource: snapshot.rig.artwork.source,
       rig: snapshot.rig,
       motions: snapshot.motions,
     });
-    const opened = await openV1Project(adapter, {
-      artwork: snapshot.artwork,
-      artworkSource: snapshot.rig.artwork.source,
-      rig: snapshot.rig,
-      motions: snapshot.motions,
-    });
+    const imported = adapter.loadSvg(opened.artwork);
+    const importErrors = imported.diagnostics.filter((item) => item.severity === "error");
+    if (importErrors.length > 0) {
+      throw new Error(`SVG 舞台载入失败：${importErrors.map((item) => item.message).join("；")}`);
+    }
     const bound = adapter.bindRig(opened.rig);
+    const bindingErrors = bound.diagnostics.filter((item) => item.severity === "error");
+    if (bindingErrors.length > 0) {
+      throw new Error(`Rig 舞台绑定失败：${bindingErrors.map((item) => item.message).join("；")}`);
+    }
     stopAnimation();
     setArtwork(opened.artwork);
     setFingerprint(opened.fingerprint);
     setManifest(snapshot.manifest);
     setProjectRoot(options.root);
     setSavedHostSignature(options.savedSignature ?? await sha256Text(projectDocumentText(snapshot)));
-    setDiagnostics(bound.diagnostics);
+    setDiagnostics([...imported.diagnostics, ...bound.diagnostics]);
     setImportResult(bound);
     const nextHistory = createEditorHistory({ rig: opened.rig, motions: opened.motions });
     setHistory(options.recovered ? { ...nextHistory, savedSignature: `recovery:${Date.now()}` } : nextHistory);
