@@ -1,12 +1,33 @@
-import type {
-  CharacterRigV1,
-  MotionClipV1,
-  MotionLibraryV1,
-  RigPartV1,
-  ValidationIssue,
+import {
+  sha256CanonicalText,
+  validateMotionLibrary,
+  validateRig,
+  type CharacterRigV1,
+  type MotionClipV1,
+  type MotionLibraryV1,
+  type RigPartV1,
+  type ValidationIssue,
 } from "@ltypet/character-motion";
-import { validateMotionLibrary, validateRig } from "@ltypet/character-motion";
 import type { ImportResult, ImportedPartRef } from "../svgcanvas/SvgCanvasAdapter";
+import type { StageAdapter } from "../svgcanvas/SvgCanvasAdapter";
+import {
+  findSourceBindingMatches,
+  inspectSvgForImport,
+} from "../import/inspectSvgForImport";
+
+export interface V1ProjectSource {
+  artwork: string;
+  artworkSource: string;
+  rig: string | unknown;
+  motions: string | unknown;
+}
+
+export interface ValidatedV1Project {
+  artwork: string;
+  fingerprint: string;
+  rig: CharacterRigV1;
+  motions: MotionLibraryV1;
+}
 
 const BODY_PARTS = new Set([
   "arm_left",
@@ -114,6 +135,85 @@ export function parseMotionLibraryForRig(
   return validation.value;
 }
 
+export async function parseV1Project(source: V1ProjectSource): Promise<ValidatedV1Project> {
+  const inspection = inspectSvgForImport(source.artwork);
+  if (inspection.hasError || !inspection.root) {
+    throw new Error(`SVG 安全检查失败：${inspection.diagnostics
+      .filter((diagnostic) => diagnostic.severity === "error")
+      .map((diagnostic) => diagnostic.message)
+      .join("；")}`);
+  }
+
+  const rigInput = parseJsonInput(source.rig, "Rig");
+  const rigValidation = validateRig(rigInput);
+  if (!rigValidation.ok) {
+    throw new Error(`Rig 文件校验失败：${formatValidationIssues(rigValidation.issues)}`);
+  }
+  const rig = rigValidation.value;
+  const fingerprint = await sha256CanonicalText(source.artwork);
+  if (rig.artwork.fingerprint !== fingerprint) {
+    throw new Error(`Rig 素材指纹不匹配：期望 ${rig.artwork.fingerprint}，实际 ${fingerprint}`);
+  }
+  if (rig.artwork.source !== source.artworkSource) {
+    throw new Error(`Rig 素材来源不匹配：期望 ${rig.artwork.source}，实际 ${source.artworkSource}`);
+  }
+
+  const actualViewBox = readStrictViewBox(inspection.root);
+  if (!equalViewBox(actualViewBox, rig.artwork.viewBox)) {
+    throw new Error("Rig viewBox 与当前素材不匹配");
+  }
+  const claimedElements = new Map<SVGElement, string>();
+  for (const part of rig.parts) {
+    const matches = findSourceBindingMatches(inspection.root, part.sourceBinding);
+    if (matches.length !== 1) {
+      throw new Error(
+        `Rig Part ${part.id} 的 ${part.sourceBinding.kind} binding 命中 ${matches.length} 个节点`,
+      );
+    }
+    const claimedBy = claimedElements.get(matches[0]);
+    if (claimedBy) {
+      throw new Error(`Rig Part ${part.id} 与 ${claimedBy} 绑定到同一素材节点`);
+    }
+    claimedElements.set(matches[0], part.id);
+  }
+
+  const motionsInput = parseJsonInput(source.motions, "动作");
+  const motionsValidation = validateMotionLibrary(motionsInput, rig);
+  if (!motionsValidation.ok) {
+    throw new Error(`动作文件校验失败：${formatValidationIssues(motionsValidation.issues)}`);
+  }
+  if (motionsValidation.value.rigId !== rig.rigId) {
+    throw new Error(
+      `动作 rigId 不匹配：期望 ${rig.rigId}，实际 ${motionsValidation.value.rigId}`,
+    );
+  }
+
+  return {
+    artwork: source.artwork,
+    fingerprint,
+    rig,
+    motions: motionsValidation.value,
+  };
+}
+
+export async function openV1Project(
+  adapter: StageAdapter,
+  source: V1ProjectSource,
+): Promise<ValidatedV1Project> {
+  const project = await parseV1Project(source);
+  const imported = adapter.loadSvg(project.artwork);
+  const importErrors = imported.diagnostics.filter((item) => item.severity === "error");
+  if (importErrors.length > 0) {
+    throw new Error(`SVG 舞台载入失败：${importErrors.map((item) => item.message).join("；")}`);
+  }
+  const bound = adapter.bindRig(project.rig);
+  const bindingErrors = bound.diagnostics.filter((item) => item.severity === "error");
+  if (bindingErrors.length > 0) {
+    throw new Error(`Rig 舞台绑定失败：${bindingErrors.map((item) => item.message).join("；")}`);
+  }
+  return project;
+}
+
 export function parseRigForArtwork(
   text: string,
   imported: ImportResult,
@@ -172,4 +272,27 @@ export function firstPlayableTrack(library: MotionLibraryV1): {
 
 function formatValidationIssues(issues: ValidationIssue[]): string {
   return issues.map((issue) => `${issue.path} [${issue.code}] ${issue.message}`).join("；");
+}
+
+function parseJsonInput(input: string | unknown, label: string): unknown {
+  if (typeof input !== "string") return input;
+  try {
+    return JSON.parse(input);
+  } catch (error: unknown) {
+    throw new Error(`${label} JSON 解析失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function readStrictViewBox(root: SVGSVGElement): [number, number, number, number] | null {
+  const values = root.getAttribute("viewBox")?.trim().split(/[\s,]+/).map(Number);
+  return values?.length === 4 && values.every(Number.isFinite) && values[2] > 0 && values[3] > 0
+    ? values as [number, number, number, number]
+    : null;
+}
+
+function equalViewBox(
+  actual: [number, number, number, number] | null,
+  expected: [number, number, number, number],
+): boolean {
+  return actual !== null && actual.every((value, index) => value === expected[index]);
 }

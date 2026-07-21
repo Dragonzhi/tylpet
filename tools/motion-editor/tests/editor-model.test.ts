@@ -162,4 +162,37 @@ describe("keyframe document commands", () => {
     expect(history.present.motions.clips[0].tracks[0].keyframes[0].values)
       .toEqual({ rotation: 0 });
   });
+
+  it("adjusts a numeric property across the selection as one atomic command", () => {
+    let history = seeded();
+    const refs: KeyframeRef[] = [
+      { clipId: "wave", partId: "arm_right", frame: 0 },
+      { clipId: "wave", partId: "arm_right", frame: 12 },
+    ];
+    history = run(history, {
+      type: "keyframe.adjustMany",
+      refs,
+      property: "rotation",
+      delta: 2.5,
+    });
+    expect(history.present.motions.clips[0].tracks[0].keyframes.map((keyframe) => keyframe.values.rotation))
+      .toEqual([2.5, -52.5, 0]);
+    expect(history.past).toHaveLength(4);
+  });
+
+  it("rejects a multi-adjustment without partial writes when a value is absent", () => {
+    const history = seeded();
+    const result = executeEditorCommand(history, {
+      type: "keyframe.adjustMany",
+      refs: [
+        { clipId: "wave", partId: "arm_right", frame: 0 },
+        { clipId: "wave", partId: "arm_right", frame: 12 },
+      ],
+      property: "x",
+      delta: 1,
+    });
+    expect(result).toMatchObject({ ok: false });
+    expect(history.present.motions.clips[0].tracks[0].keyframes.map((keyframe) => keyframe.values))
+      .toEqual([{ rotation: 0 }, { rotation: -55 }, { rotation: 0 }]);
+  });
 });

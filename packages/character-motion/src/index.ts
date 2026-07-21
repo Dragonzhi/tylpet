@@ -58,7 +58,10 @@ export {
   topologicalOrder,
   resolveWorldPose,
   resolveAllPoses,
+  computeReparentedBindMatrix,
+  resolveWorldBindMatrices,
 } from "./rig/index.js";
+export type { ReparentBindMatrixResult } from "./rig/index.js";
 
 // Serialization
 export {

@@ -3,6 +3,113 @@
   "rigId": "xiaoluobao",
   "clips": [
     {
+      "id": "bow",
+      "fps": 24,
+      "durationFrames": 42,
+      "loop": "none",
+      "tracks": [
+        {
+          "partId": "arm_left",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0, "renderSlot": "body" }, "easing": "easeInOut" },
+            { "frame": 10, "values": { "x": 0.12, "y": 0.16, "rotation": 12 }, "easing": "easeInOut" },
+            { "frame": 22, "values": { "x": 0.18, "y": 0.46, "rotation": 21 }, "easing": "easeInOut" },
+            { "frame": 31, "values": { "x": 0.12, "y": 0.16, "rotation": 10 }, "easing": "easeInOut" },
+            { "frame": 42, "values": { "x": 0, "y": 0, "rotation": 0, "renderSlot": "body" }, "easing": "easeInOut" }
+          ]
+        },
+        {
+          "partId": "arm_right",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0, "renderSlot": "body" }, "easing": "easeInOut" },
+            { "frame": 10, "values": { "x": -0.12, "y": 0.16, "rotation": -12 }, "easing": "easeInOut" },
+            { "frame": 22, "values": { "x": -0.18, "y": 0.46, "rotation": -21 }, "easing": "easeInOut" },
+            { "frame": 31, "values": { "x": -0.12, "y": 0.16, "rotation": -10 }, "easing": "easeInOut" },
+            { "frame": 42, "values": { "x": 0, "y": 0, "rotation": 0, "renderSlot": "body" }, "easing": "easeInOut" }
+          ]
+        },
+        {
+          "partId": "body",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }, "easing": "easeInOut" },
+            { "frame": 10, "values": { "y": 0.18, "rotation": 1.2, "scaleX": 1.005, "scaleY": 0.995 }, "easing": "easeInOut" },
+            { "frame": 22, "values": { "y": 0.58, "rotation": 2.8, "scaleX": 1.012, "scaleY": 0.982 }, "easing": "easeInOut" },
+            { "frame": 31, "values": { "y": 0.18, "rotation": 0.8, "scaleX": 1.005, "scaleY": 0.995 }, "easing": "easeInOut" },
+            { "frame": 42, "values": { "x": 0, "y": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }, "easing": "easeInOut" }
+          ]
+        },
+        {
+          "partId": "head",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0 }, "easing": "easeInOut" },
+            { "frame": 9, "values": { "y": 0.3, "rotation": 2.5 }, "easing": "easeInOut" },
+            { "frame": 22, "values": { "y": 1.05, "rotation": 7.5 }, "easing": "easeInOut" },
+            { "frame": 28, "values": { "y": 1.02, "rotation": 7.1 }, "easing": "easeInOut" },
+            { "frame": 34, "values": { "y": 0.2, "rotation": 1.8 }, "easing": "easeOut" },
+            { "frame": 42, "values": { "x": 0, "y": 0, "rotation": 0 }, "easing": "easeInOut" }
+          ]
+        }
+      ],
+      "events": [],
+      "suppressProceduralChannels": ["breathing", "pointer-follow"]
+    },
+    {
+      "id": "stretch",
+      "fps": 24,
+      "durationFrames": 52,
+      "loop": "none",
+      "tracks": [
+        {
+          "partId": "arm_left",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0, "renderSlot": "body" }, "easing": "easeInOut" },
+            { "frame": 8, "values": { "x": -0.1, "y": -0.18, "rotation": 16, "renderSlot": "front" }, "easing": "easeInOut" },
+            { "frame": 20, "values": { "x": -0.22, "y": -0.54, "rotation": 44 }, "easing": "easeOut" },
+            { "frame": 31, "values": { "x": -0.24, "y": -0.6, "rotation": 48 }, "easing": "easeInOut" },
+            { "frame": 43, "values": { "x": -0.08, "y": -0.14, "rotation": 12 }, "easing": "easeInOut" },
+            { "frame": 47, "values": { "x": -0.03, "y": -0.05, "rotation": 4, "renderSlot": "body" }, "easing": "easeInOut" },
+            { "frame": 52, "values": { "x": 0, "y": 0, "rotation": 0 }, "easing": "easeInOut" }
+          ]
+        },
+        {
+          "partId": "arm_right",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0, "renderSlot": "body" }, "easing": "easeInOut" },
+            { "frame": 8, "values": { "x": 0.1, "y": -0.18, "rotation": -16, "renderSlot": "front" }, "easing": "easeInOut" },
+            { "frame": 20, "values": { "x": 0.22, "y": -0.54, "rotation": -44 }, "easing": "easeOut" },
+            { "frame": 31, "values": { "x": 0.24, "y": -0.6, "rotation": -48 }, "easing": "easeInOut" },
+            { "frame": 43, "values": { "x": 0.08, "y": -0.14, "rotation": -12 }, "easing": "easeInOut" },
+            { "frame": 47, "values": { "x": 0.03, "y": -0.05, "rotation": -4, "renderSlot": "body" }, "easing": "easeInOut" },
+            { "frame": 52, "values": { "x": 0, "y": 0, "rotation": 0 }, "easing": "easeInOut" }
+          ]
+        },
+        {
+          "partId": "body",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }, "easing": "easeInOut" },
+            { "frame": 10, "values": { "y": 0.12, "scaleX": 1.015, "scaleY": 0.99 }, "easing": "easeInOut" },
+            { "frame": 24, "values": { "y": -0.2, "scaleX": 0.985, "scaleY": 1.025 }, "easing": "easeOut" },
+            { "frame": 34, "values": { "y": -0.24, "scaleX": 0.982, "scaleY": 1.03 }, "easing": "easeInOut" },
+            { "frame": 44, "values": { "y": 0.08, "scaleX": 1.008, "scaleY": 0.996 }, "easing": "easeInOut" },
+            { "frame": 52, "values": { "x": 0, "y": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }, "easing": "easeInOut" }
+          ]
+        },
+        {
+          "partId": "head",
+          "keyframes": [
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0 }, "easing": "easeInOut" },
+            { "frame": 12, "values": { "y": -0.12, "rotation": -1.5 }, "easing": "easeInOut" },
+            { "frame": 25, "values": { "y": -0.38, "rotation": -3.5 }, "easing": "easeOut" },
+            { "frame": 34, "values": { "y": -0.4, "rotation": -3.2 }, "easing": "easeInOut" },
+            { "frame": 45, "values": { "y": 0.06, "rotation": 0.8 }, "easing": "easeInOut" },
+            { "frame": 52, "values": { "x": 0, "y": 0, "rotation": 0 }, "easing": "easeInOut" }
+          ]
+        }
+      ],
+      "events": [],
+      "suppressProceduralChannels": ["breathing", "pointer-follow"]
+    },
+    {
       "id": "wave",
       "fps": 24,
       "durationFrames": 38,
@@ -11,7 +118,7 @@
         {
           "partId": "arm_right",
           "keyframes": [
-            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0.8, "renderSlot": "body" }, "easing": "easeInOut" },
+            { "frame": 0, "values": { "x": 0, "y": 0, "rotation": 0, "renderSlot": "body" }, "easing": "easeInOut" },
             { "frame": 3, "values": { "x": 0.34, "y": -0.16, "rotation": -18 }, "easing": "easeInOut" },
             { "frame": 5, "values": { "x": 0.34, "y": -0.06, "rotation": -106, "renderSlot": "front" }, "easing": "easeInOut" },
             { "frame": 12, "values": { "x": 0.34, "y": -0.06, "rotation": -90 }, "easing": "easeInOut" },
@@ -20,7 +127,7 @@
             { "frame": 28, "values": { "x": 0.34, "y": -0.06, "rotation": -112 }, "easing": "easeInOut" },
             { "frame": 33, "values": { "x": 0.34, "y": -0.06, "rotation": -104 }, "easing": "easeInOut" },
             { "frame": 35, "values": { "x": 0.34, "y": -0.16, "rotation": -12, "renderSlot": "body" }, "easing": "easeInOut" },
-            { "frame": 38, "values": { "x": 0, "y": 0, "rotation": 0.8 }, "easing": "easeInOut" }
+            { "frame": 38, "values": { "x": 0, "y": 0, "rotation": 0 }, "easing": "easeInOut" }
           ]
         }
       ],

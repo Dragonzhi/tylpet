@@ -12,8 +12,11 @@ import {
   identity,
   multiply,
 } from "@ltypet/character-motion";
-import type { AffineMatrix } from "@ltypet/character-motion";
-import { inspectSvgForImport } from "../import/inspectSvgForImport";
+import type { AffineMatrix, CharacterRigV1, SourceBinding } from "@ltypet/character-motion";
+import {
+  findSourceBindingMatches,
+  inspectSvgForImport,
+} from "../import/inspectSvgForImport";
 
 export interface ImportedPartRef {
   partId: string;
@@ -61,6 +64,7 @@ export interface StageAdapter {
   mount(container: HTMLElement): void;
   getVersion(): string;
   loadSvg(source: string): ImportResult;
+  bindRig(rig: CharacterRigV1): ImportResult;
   selectPart(partId: string): boolean;
   onPartSelected(listener: ((partId: string) => void) | null): void;
   applyPreviewTransform(partId: string, transform: PreviewTransform): void;
@@ -86,6 +90,10 @@ const DEFAULT_VIEW_BOX: [number, number, number, number] = [0, 0, 1, 1];
 
 function matrixToString(matrix: AffineMatrix): string {
   return `matrix(${matrix.join(" ")})`;
+}
+
+function sourceBindingKey(binding: SourceBinding): string {
+  return `${binding.kind}\0${binding.value}`;
 }
 
 function domMatrixToTuple(matrix: DOMMatrix): AffineMatrix {
@@ -152,6 +160,7 @@ export class SvgCanvasAdapter implements StageAdapter {
   private suppressSelectionCallback = false;
   private container: HTMLElement | null = null;
   private renderOrderAltered = false;
+  private readonly loadedBindingElementIds = new Map<string, string[]>();
 
   mount(container: HTMLElement): void {
     if (this.canvas) throw new Error("SvgCanvas 已挂载");
@@ -179,6 +188,23 @@ export class SvgCanvasAdapter implements StageAdapter {
     if (inspection.hasError) {
       diagnostics.unshift({ severity: "error", message: "安全导入拒绝：SVG 未进入 svgcanvas" });
       return { parts: [], pivotLocal: new Map(), viewBox: DEFAULT_VIEW_BOX, diagnostics };
+    }
+
+    this.loadedBindingElementIds.clear();
+    if (inspection.root) {
+      const elements = [inspection.root, ...inspection.root.querySelectorAll("*")]
+        .filter((element): element is SVGElement => element instanceof SVGElement && element.id.length > 0);
+      for (const element of elements) {
+        const bindings: SourceBinding[] = [{ kind: "elementId", value: element.id }];
+        const label = element.getAttributeNS("http://www.inkscape.org/namespaces/inkscape", "label");
+        if (label) bindings.push({ kind: "inkscapeLabel", value: label });
+        const dataPart = element.getAttribute("data-part");
+        if (dataPart) bindings.push({ kind: "dataPart", value: dataPart });
+        for (const binding of bindings) {
+          const key = sourceBindingKey(binding);
+          this.loadedBindingElementIds.set(key, [...(this.loadedBindingElementIds.get(key) ?? []), element.id]);
+        }
+      }
     }
 
     if (!this.canvas.setSvgString(source)) {
@@ -270,6 +296,103 @@ export class SvgCanvasAdapter implements StageAdapter {
     this.canvas.selectOnly([part.element], false);
     this.suppressSelectionCallback = false;
     return true;
+  }
+
+  bindRig(rig: CharacterRigV1): ImportResult {
+    if (!this.canvas) throw new Error("SvgCanvas 未初始化");
+    const root = this.canvas.getSvgRoot();
+    const content = this.canvas.getSvgContent();
+    const diagnostics: Diagnostic[] = [];
+    const refs: ImportedPartRef[] = [];
+    const nextIndex = new Map<string, ImportedPartRef>();
+    const nextPivots = new Map<string, { x: number; y: number }>();
+    const claimedElements = new Map<SVGElement, string>();
+    const sourceOrder = new Map(
+      [content, ...content.querySelectorAll("*")].map((element, index) => [element, index]),
+    );
+
+    for (const rigPart of rig.parts) {
+      if (nextIndex.has(rigPart.id)) {
+        diagnostics.push({
+          severity: "error",
+          message: `Rig Part ID 重复: "${rigPart.id}"`,
+        });
+        continue;
+      }
+      const preservedIds = this.loadedBindingElementIds.get(sourceBindingKey(rigPart.sourceBinding));
+      const matches = preservedIds
+        ? preservedIds.flatMap((id) => {
+            const element = root.ownerDocument.getElementById(id);
+            return element instanceof SVGElement ? [element] : [];
+          })
+        : findSourceBindingMatches(content, rigPart.sourceBinding);
+      if (matches.length !== 1) {
+        diagnostics.push({
+          severity: "error",
+          message: `Rig Part "${rigPart.id}" 的 ${formatSourceBinding(rigPart.sourceBinding)} 命中 ${matches.length} 个节点`,
+        });
+        continue;
+      }
+
+      const element = matches[0];
+      const claimedBy = claimedElements.get(element);
+      if (claimedBy) {
+        diagnostics.push({
+          severity: "error",
+          message: `Rig Part "${rigPart.id}" 与 "${claimedBy}" 绑定到同一素材节点`,
+        });
+        continue;
+      }
+      claimedElements.set(element, rigPart.id);
+      const ref: ImportedPartRef = {
+        partId: rigPart.id,
+        inkscapeLabel: element.getAttributeNS(
+          "http://www.inkscape.org/namespaces/inkscape",
+          "label",
+        ) ?? "",
+        sourceElementId: element.id,
+        element,
+        bindMatrix: [...rigPart.bindMatrix],
+        originalTransform: element.getAttribute("transform"),
+        originalOpacity: element.getAttribute("opacity"),
+        originalDisplay: element.getAttribute("display"),
+        sourceOrder: sourceOrder.get(element) ?? Number.MAX_SAFE_INTEGER,
+        originalParent: element.parentNode,
+        originalNextSibling: element.nextSibling,
+      };
+      refs.push(ref);
+      nextIndex.set(rigPart.id, ref);
+      nextPivots.set(rigPart.id, { x: rigPart.pivot.x, y: rigPart.pivot.y });
+    }
+
+    if (diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+      return {
+        parts: [],
+        pivotLocal: new Map(),
+        viewBox: readViewBox(content),
+        diagnostics,
+      };
+    }
+
+    this.restoreAllBindPoses();
+    if (this.renderOrderAltered) this.restoreRenderOrder();
+    this.partIndex.clear();
+    this.pivotLocal.clear();
+    this.loadedBindingElementIds.clear();
+    for (const [partId, ref] of nextIndex) this.partIndex.set(partId, ref);
+    for (const [partId, pivot] of nextPivots) this.pivotLocal.set(partId, pivot);
+    this.installStageSelection(root);
+
+    diagnostics.push({
+      severity: "info",
+      message: `Rig 绑定完成: ${refs.length} 个部件`,
+    });
+    return {
+      parts: refs,
+      pivotLocal: new Map(this.pivotLocal),
+      viewBox: readViewBox(content),
+      diagnostics,
+    };
   }
 
   onPartSelected(listener: ((partId: string) => void) | null): void {
@@ -395,10 +518,14 @@ export class SvgCanvasAdapter implements StageAdapter {
     overrides: Map<string, string>,
     slotOrder: string[],
   ): void {
-    if (overrides.size === 0) {
+    const changedOverrides = new Map(
+      [...overrides].filter(([partId, slot]) => slot !== defaultSlots.get(partId)),
+    );
+    if (changedOverrides.size === 0) {
       if (this.renderOrderAltered) this.restoreRenderOrder();
       return;
     }
+    if (this.renderOrderAltered) this.restoreRenderOrder();
     const slotIndex = new Map(slotOrder.map((slot, index) => [slot, index]));
     const groups = new Map<Node, ImportedPartRef[]>();
     for (const part of this.partIndex.values()) {
@@ -410,8 +537,8 @@ export class SvgCanvasAdapter implements StageAdapter {
     }
     for (const [parent, parts] of groups) {
       parts.sort((left, right) => {
-        const leftSlot = overrides.get(left.partId) ?? defaultSlots.get(left.partId) ?? "";
-        const rightSlot = overrides.get(right.partId) ?? defaultSlots.get(right.partId) ?? "";
+        const leftSlot = changedOverrides.get(left.partId) ?? defaultSlots.get(left.partId) ?? "";
+        const rightSlot = changedOverrides.get(right.partId) ?? defaultSlots.get(right.partId) ?? "";
         const slotDifference = (slotIndex.get(leftSlot) ?? 0) - (slotIndex.get(rightSlot) ?? 0);
         return slotDifference || left.sourceOrder - right.sourceOrder;
       });
@@ -425,6 +552,7 @@ export class SvgCanvasAdapter implements StageAdapter {
   }
 
   dispose(): void {
+    const container = this.container;
     this.removeStageSelection();
     this.restoreAllBindPoses();
     if (this.renderOrderAltered) this.restoreRenderOrder();
@@ -434,6 +562,7 @@ export class SvgCanvasAdapter implements StageAdapter {
     this.selectionListener = null;
     this.container = null;
     this.canvas = null;
+    container?.replaceChildren();
   }
 
   private restoreAllBindPoses(): void {
@@ -477,4 +606,8 @@ export class SvgCanvasAdapter implements StageAdapter {
     }
     this.stagePointerHandler = null;
   }
+}
+
+function formatSourceBinding(binding: SourceBinding): string {
+  return `${binding.kind}="${binding.value}"`;
 }

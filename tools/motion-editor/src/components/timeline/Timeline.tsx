@@ -1,10 +1,26 @@
-import { useRef, useState } from "react";
-import type { MotionClipV1, MotionKeyframeV1 } from "@ltypet/character-motion";
+import { useEffect, useRef, useState } from "react";
+import type {
+  CharacterRigV1,
+  MotionClipV1,
+  MotionEventType,
+} from "@ltypet/character-motion";
 import type { KeyframeRef } from "../../editor/model/types";
 import { clampKeyframeDelta, frameToTimelineX, timelineXToFrame } from "../../timeline/geometry";
+import {
+  getFilteredTimelineRows,
+  normalizeTimelineRange,
+  pixelsPerFrameForRange,
+  TIMELINE_PROPERTIES,
+} from "../../timeline/model";
+import type { TimelineProperty, TimelineRange } from "../../timeline/model";
+import { ClipDiagnostics } from "./ClipDiagnostics";
 
-interface Props {
+type NumericProperty = Exclude<TimelineProperty, "renderSlot">;
+
+export interface TimelineProps {
   clip: MotionClipV1;
+  rig?: CharacterRigV1;
+  supportedEvents?: readonly MotionEventType[];
   selectedPartId: string | null;
   currentFrame: number;
   pixelsPerFrame: number;
@@ -13,20 +29,17 @@ interface Props {
   onPixelsPerFrameChange(value: number): void;
   onSelectKeyframe(ref: KeyframeRef, modifiers: { toggle: boolean; range: boolean }): void;
   onMoveKeyframes(refs: KeyframeRef[], deltaFrames: number): void;
+  onAdjustKeyframes?(refs: KeyframeRef[], property: NumericProperty, delta: number): void;
 }
 
-const PROPERTY_ROWS: Array<{ id: keyof MotionKeyframeV1["values"]; label: string }> = [
-  { id: "x", label: "X" },
-  { id: "y", label: "Y" },
-  { id: "rotation", label: "旋转" },
-  { id: "scaleX", label: "缩放 X" },
-  { id: "scaleY", label: "缩放 Y" },
-  { id: "opacity", label: "透明度" },
-  { id: "renderSlot", label: "层级" },
-];
+const NUMERIC_PROPERTIES = TIMELINE_PROPERTIES.filter(
+  (property): property is { id: NumericProperty; label: string } => property.id !== "renderSlot",
+);
 
 export function Timeline({
   clip,
+  rig,
+  supportedEvents,
   selectedPartId,
   currentFrame,
   pixelsPerFrame,
@@ -35,16 +48,69 @@ export function Timeline({
   onPixelsPerFrameChange,
   onSelectKeyframe,
   onMoveKeyframes,
-}: Props) {
+  onAdjustKeyframes,
+}: TimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
+  const zoomFrameRef = useRef<number | null>(null);
   const [drag, setDrag] = useState<{ refs: KeyframeRef[]; startX: number; delta: number } | null>(null);
+  const [partFilter, setPartFilter] = useState<string>("");
+  const [propertyFilter, setPropertyFilter] = useState<TimelineProperty | "">("");
+  const [keyedOnly, setKeyedOnly] = useState(false);
+  const [rangeStart, setRangeStart] = useState("0");
+  const [rangeEnd, setRangeEnd] = useState(String(clip.durationFrames));
+  const [visibleRange, setVisibleRange] = useState<TimelineRange | null>(null);
+  const [moveDelta, setMoveDelta] = useState("1");
+  const [adjustProperty, setAdjustProperty] = useState<NumericProperty>("rotation");
+  const [adjustDelta, setAdjustDelta] = useState("1");
+  useEffect(() => {
+    setRangeStart("0");
+    setRangeEnd(String(clip.durationFrames));
+    setVisibleRange(null);
+  }, [clip.id, clip.durationFrames]);
+  useEffect(() => () => {
+    if (zoomFrameRef.current !== null) cancelAnimationFrame(zoomFrameRef.current);
+  }, []);
   const width = Math.max(clip.durationFrames * pixelsPerFrame + 40, 640);
   const selectedSet = new Set(selectedKeyframes.map((ref) => `${ref.clipId}\0${ref.partId}\0${ref.frame}`));
-  const trackIds = [...new Set([
+  const availablePartIds = [...new Set([
     ...(selectedPartId ? [selectedPartId] : []),
     ...clip.tracks.map((track) => track.partId),
   ])];
+  const rows = getFilteredTimelineRows(clip, selectedPartId, {
+    partId: partFilter || null,
+    property: propertyFilter || null,
+    keyedOnly,
+  });
+
+  const zoomToRange = () => {
+    const range = normalizeTimelineRange(Number(rangeStart), Number(rangeEnd), clip.durationFrames);
+    if (!range) return;
+    const scroll = scrollRef.current;
+    const nextPixelsPerFrame = pixelsPerFrameForRange(range, scroll?.clientWidth ?? 0);
+    setRangeStart(String(range.startFrame));
+    setRangeEnd(String(range.endFrame));
+    setVisibleRange(range);
+    onPixelsPerFrameChange(nextPixelsPerFrame);
+    if (zoomFrameRef.current !== null) cancelAnimationFrame(zoomFrameRef.current);
+    zoomFrameRef.current = requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollLeft = frameToTimelineX(range.startFrame, nextPixelsPerFrame);
+      zoomFrameRef.current = null;
+    });
+  };
+
+  const moveSelectedByInput = () => {
+    const requested = Number(moveDelta);
+    if (!Number.isInteger(requested) || requested === 0 || selectedKeyframes.length === 0) return;
+    const delta = clampKeyframeDelta(selectedKeyframes.map((ref) => ref.frame), requested, clip.durationFrames);
+    if (delta !== 0) onMoveKeyframes(selectedKeyframes, delta);
+  };
+
+  const adjustSelectedByInput = () => {
+    const delta = Number(adjustDelta);
+    if (!onAdjustKeyframes || !Number.isFinite(delta) || delta === 0 || selectedKeyframes.length === 0) return;
+    onAdjustKeyframes(selectedKeyframes, adjustProperty, delta);
+  };
 
   const setFrameFromPointer = (clientX: number) => {
     const scroll = scrollRef.current;
@@ -87,7 +153,7 @@ export function Timeline({
       <div className="timeline-toolbar">
         <strong>{clip.id}</strong>
         <span>{clip.fps} fps · 0—{clip.durationFrames}</span>
-        <label>
+        <label className="timeline-zoom-control">
           缩放
           <input
             type="range"
@@ -97,6 +163,42 @@ export function Timeline({
             onChange={(event) => onPixelsPerFrameChange(Number(event.target.value))}
           />
         </label>
+      </div>
+      <div className="timeline-tools" aria-label="时间轴效率工具">
+        <label>
+          Part
+          <select value={partFilter} onChange={(event) => setPartFilter(event.target.value)}>
+            <option value="">全部</option>
+            {availablePartIds.map((partId) => <option key={partId} value={partId}>{partId}</option>)}
+          </select>
+        </label>
+        <label>
+          属性
+          <select value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value as TimelineProperty | "")}>
+            <option value="">全部</option>
+            {TIMELINE_PROPERTIES.map((property) => <option key={property.id} value={property.id}>{property.label}</option>)}
+          </select>
+        </label>
+        <label className="timeline-check">
+          <input type="checkbox" checked={keyedOnly} onChange={(event) => setKeyedOnly(event.target.checked)} />
+          仅有关键帧
+        </label>
+        <span className="timeline-tool-separator" />
+        <label>区间 <input aria-label="区间起始帧" type="number" min="0" max={clip.durationFrames} value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label>
+        <span>—</span>
+        <input aria-label="区间结束帧" type="number" min="0" max={clip.durationFrames} value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} />
+        <button type="button" onClick={zoomToRange}>缩放到区间</button>
+        <span className="timeline-tool-separator" />
+        <label>位移 <input aria-label="批量帧位移" type="number" step="1" value={moveDelta} onChange={(event) => setMoveDelta(event.target.value)} /></label>
+        <button type="button" disabled={selectedKeyframes.length === 0} onClick={moveSelectedByInput}>移动所选</button>
+        <label>
+          微调
+          <select value={adjustProperty} onChange={(event) => setAdjustProperty(event.target.value as NumericProperty)}>
+            {NUMERIC_PROPERTIES.map((property) => <option key={property.id} value={property.id}>{property.label}</option>)}
+          </select>
+        </label>
+        <input aria-label="多选关键帧微调量" type="number" step="any" value={adjustDelta} onChange={(event) => setAdjustDelta(event.target.value)} />
+        <button type="button" disabled={!onAdjustKeyframes || selectedKeyframes.length === 0} onClick={adjustSelectedByInput}>应用微调</button>
       </div>
       <div className="timeline-grid">
         <div
@@ -110,9 +212,9 @@ export function Timeline({
           }}
         >
           <div className="timeline-ruler-label">帧</div>
-          {trackIds.flatMap((partId) => [
-            <div key={`${partId}-main`} className={`track-label part ${partId === selectedPartId ? "selected" : ""}`}>{partId}</div>,
-            ...PROPERTY_ROWS.map((property) => (
+          {rows.flatMap(({ partId, properties }) => [
+            ...(propertyFilter ? [] : [<div key={`${partId}-main`} className={`track-label part ${partId === selectedPartId ? "selected" : ""}`}>{partId}</div>]),
+            ...properties.map((property) => (
               <div key={`${partId}-${property.id}`} className="track-label property">{property.label}</div>
             )),
           ])}
@@ -128,6 +230,15 @@ export function Timeline({
           }}
         >
           <div className="timeline-content" style={{ width }}>
+            {visibleRange && (
+              <div
+                className="timeline-range"
+                style={{
+                  left: frameToTimelineX(visibleRange.startFrame, pixelsPerFrame),
+                  width: frameToTimelineX(visibleRange.endFrame - visibleRange.startFrame, pixelsPerFrame),
+                }}
+              />
+            )}
             <button
               type="button"
               className="frame-ruler"
@@ -145,7 +256,7 @@ export function Timeline({
                   </span>
                 ))}
             </button>
-            {trackIds.flatMap((partId) => {
+            {rows.flatMap(({ partId, properties }) => {
               const track = clip.tracks.find((candidate) => candidate.partId === partId);
               const main = (
                 <div key={`${partId}-main`} className="track-row part-track">
@@ -176,7 +287,7 @@ export function Timeline({
                   })}
                 </div>
               );
-              const properties = PROPERTY_ROWS.map((property) => (
+              const propertyRows = properties.map((property) => (
                 <div key={`${partId}-${property.id}`} className="track-row property-track">
                   {track?.keyframes.filter((keyframe) => keyframe.values[property.id] !== undefined).map((keyframe) => (
                     <span
@@ -187,7 +298,7 @@ export function Timeline({
                   ))}
                 </div>
               ));
-              return [main, ...properties];
+              return [...(propertyFilter ? [] : [main]), ...propertyRows];
             })}
             <div className="playhead" style={{ left: frameToTimelineX(currentFrame, pixelsPerFrame) }}>
               <span>{currentFrame}</span>
@@ -195,6 +306,7 @@ export function Timeline({
           </div>
         </div>
       </div>
+      {rig && <ClipDiagnostics clip={clip} rig={rig} supportedEvents={supportedEvents} />}
     </section>
   );
 }

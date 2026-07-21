@@ -3,6 +3,8 @@
  * 只一个入口 inspectSvgForImport()：零 error 才允许调用 setSvgString()。
  */
 
+import type { SourceBinding } from "@ltypet/character-motion";
+
 export interface Diagnostic {
   severity: "error" | "warn" | "info";
   message: string;
@@ -28,10 +30,27 @@ export interface InspectForImportResult {
   parts: PartInfo[];
   /** partId → pivot 原始 SVG 坐标 */
   pivotMap: Map<string, PivotInfo>;
+  /** 已通过安全检查的解析结果，供正式 rig binding 校验使用。 */
+  root: SVGSVGElement | null;
 }
 
 /** 不作为语义部件的容器 label */
 const CONTAINER_LABELS = new Set(["character", "hair_accessory"]);
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+const INKSCAPE_NAMESPACE = "http://www.inkscape.org/namespaces/inkscape";
+
+export function findSourceBindingMatches(
+  root: SVGSVGElement,
+  binding: SourceBinding,
+): SVGElement[] {
+  const elements = [root, ...root.querySelectorAll("*")];
+  return elements.filter((element): element is SVGElement => {
+    if (!(element instanceof SVGElement)) return false;
+    if (binding.kind === "elementId") return element.getAttribute("id") === binding.value;
+    if (binding.kind === "dataPart") return element.getAttribute("data-part") === binding.value;
+    return element.getAttributeNS(INKSCAPE_NAMESPACE, "label") === binding.value;
+  });
+}
 
 /**
  * 统一导入安全门。
@@ -59,16 +78,21 @@ export function inspectSvgForImport(svgText: string): InspectForImportResult {
       severity: "error",
       message: `XML 解析错误: ${parseError.textContent?.slice(0, 200) ?? "未知"}`,
     });
-    return { hasError: true, diagnostics: diags, parts: [], pivotMap: new Map() };
+    return { hasError: true, diagnostics: diags, parts: [], pivotMap: new Map(), root: null };
   }
 
   const svgRoot = doc.documentElement;
-  if (!svgRoot || svgRoot.tagName.toLowerCase() !== "svg") {
+  if (
+    !svgRoot ||
+    svgRoot.localName !== "svg" ||
+    svgRoot.namespaceURI !== SVG_NAMESPACE
+  ) {
     diags.push({ severity: "error", message: "根元素不是 <svg>" });
-    return { hasError: true, diagnostics: diags, parts: [], pivotMap: new Map() };
+    return { hasError: true, diagnostics: diags, parts: [], pivotMap: new Map(), root: null };
   }
 
-  const allElements = svgRoot.querySelectorAll("*");
+  const root = svgRoot as unknown as SVGSVGElement;
+  const allElements = [root, ...root.querySelectorAll("*")];
 
   // ---- 2 & 3. 危险标签 + 完整 on* 遍历 ----
   for (const el of allElements) {
@@ -116,6 +140,13 @@ export function inspectSvgForImport(svgText: string): InspectForImportResult {
     }
 
     for (const cssSource of cssSources) {
+      if (el.localName === "style" && /@import\b/i.test(cssSource)) {
+        diags.push({
+          severity: "error",
+          message: "禁止 CSS @import 在 <style>",
+        });
+      }
+
       const urlMatches = cssSource.matchAll(/url\(([^)]*)\)/gi);
       for (const match of urlMatches) {
         const url = match[1].replace(/['"]/g, "").trim();
@@ -229,5 +260,5 @@ export function inspectSvgForImport(svgText: string): InspectForImportResult {
   }
 
   const hasError = diags.some((d) => d.severity === "error");
-  return { hasError, diagnostics: diags, parts, pivotMap };
+  return { hasError, diagnostics: diags, parts, pivotMap, root };
 }

@@ -8,14 +8,17 @@
     "build": "tsc && vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "tauri": "tauri",
     "generate:rig": "vite-node scripts/generate-xiaoluobao-rig.ts"
   },
   "dependencies": {
     "@svgedit/svgcanvas": "7.4.2",
+    "@tauri-apps/api": "2.11.1",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "4.7.0",

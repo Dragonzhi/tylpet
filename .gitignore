@@ -22,11 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.kilo/*
 
 # Tauri (Rust build output)
 src-tauri/target/
 src-tauri/debug/
 src-tauri/release/
+tools/motion-editor/src-tauri/target/
 
 # npm / node
 package-lock.json

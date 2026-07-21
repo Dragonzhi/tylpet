@@ -3,7 +3,6 @@ import type {
   EasingValue,
   MotionClipV1,
   MotionKeyframeV1,
-  MotionLibraryV1,
   ProceduralChannel,
   TransformValue,
 } from "@ltypet/character-motion";
@@ -11,12 +10,14 @@ import {
   sampleMotionClip,
   serializeMotionLibrary,
   serializeRig,
-  sha256CanonicalText,
   validateMotionLibrary,
 } from "@ltypet/character-motion";
-import rawGlaxSvg from "../../../src/assets/小洛宝.glax.svg?raw";
+import builtInArtwork from "../../../src/assets/character/xiaoluobao/artwork.svg?raw";
+import builtInRig from "../../../src/assets/character/xiaoluobao/rig.v1.json?raw";
+import builtInMotions from "../../../src/assets/character/xiaoluobao/motions.v1.json?raw";
 import { PartTree } from "./components/parts/PartTree";
 import { TransformInspector } from "./components/inspector/TransformInspector";
+import { RigInspector } from "./components/inspector/RigInspector";
 import { TransformGizmo } from "./components/stage/TransformGizmo";
 import { Timeline } from "./components/timeline/Timeline";
 import {
@@ -28,6 +29,7 @@ import {
   undoEditorHistory,
 } from "./editor/history/EditorHistory";
 import { createKeyframeClipboard } from "./editor/model/documentCommands";
+import { reconcilePartRename } from "./editor/session/reconcilePartRename";
 import type {
   EditorCommand,
   KeyframeClipboard,
@@ -36,13 +38,35 @@ import type {
 import type { Diagnostic, ImportResult, PartScreenGeometry } from "./svgcanvas/SvgCanvasAdapter";
 import { SvgCanvasAdapter } from "./svgcanvas/SvgCanvasAdapter";
 import {
-  buildRigFromImport,
-  createWaveExample,
+  openV1Project,
+  parseV1Project,
   parseMotionLibraryForRig,
   parseRigForArtwork,
 } from "./project/v1Project";
+import type {
+  MotionEditorProjectManifestV1,
+  MotionEditorProjectSnapshot,
+  MotionEditorRecoverySnapshotV1,
+  ProductionPublishPlan,
+  RecentMotionEditorProjectV1,
+} from "./project/manifest";
+import type { MotionEditorHost } from "./host/MotionEditorHost";
+import { createTauriMotionEditorHost, MotionEditorHostRequestError } from "./host/TauriMotionEditorHost";
 
-const SAMPLE_ARTWORK_NAME = "小洛宝.glax.svg";
+const BUILT_IN_ARTWORK_NAME = "artwork.svg";
+const BUILT_IN_MANIFEST: MotionEditorProjectManifestV1 = {
+  schemaVersion: 1,
+  projectId: "xiaoluobao",
+  displayName: "小洛宝",
+  characterRigId: "xiaoluobao",
+  files: {
+    artwork: BUILT_IN_ARTWORK_NAME,
+    rig: "rig.v1.json",
+    motions: "motions.v1.json",
+    editor: "editor.json",
+  },
+};
+const RECOVERY_DEBOUNCE_MS = 800;
 const DEFAULT_TRANSFORM: TransformValue = {
   x: 0,
   y: 0,
@@ -94,7 +118,19 @@ function cloneClip(clip: MotionClipV1, id: string): MotionClipV1 {
 }
 
 function formatError(error: unknown): string {
+  if (error instanceof MotionEditorHostRequestError) {
+    return `${error.message}（${error.stage}/${error.code}${error.path ? `：${error.path}` : ""}）`;
+  }
   return error instanceof Error ? error.message : String(error);
+}
+
+async function sha256Text(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function projectDocumentText(snapshot: MotionEditorProjectSnapshot): string {
+  return `${JSON.stringify(snapshot.rig, null, 2)}\n${JSON.stringify(snapshot.motions, null, 2)}\n`;
 }
 
 export default function App() {
@@ -111,6 +147,16 @@ export default function App() {
   const panGestureRef = useRef<{ pointerId: number; clientX: number; clientY: number; x: number; y: number } | null>(null);
 
   const [fingerprint, setFingerprint] = useState("");
+  const [artwork, setArtwork] = useState("");
+  const [manifest, setManifest] = useState<MotionEditorProjectManifestV1>(BUILT_IN_MANIFEST);
+  const [projectRoot, setProjectRoot] = useState<string | null>(null);
+  const [savedHostSignature, setSavedHostSignature] = useState("");
+  const [host, setHost] = useState<MotionEditorHost | null>(null);
+  const [hostReady, setHostReady] = useState(false);
+  const [recentProjects, setRecentProjects] = useState<RecentMotionEditorProjectV1[]>([]);
+  const [recoveryCandidates, setRecoveryCandidates] = useState<MotionEditorRecoverySnapshotV1[]>([]);
+  const [publishPlan, setPublishPlan] = useState<ProductionPublishPlan | null>(null);
+  const [hostBusy, setHostBusy] = useState(false);
   const [canvasVersion, setCanvasVersion] = useState("");
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
@@ -177,14 +223,6 @@ export default function App() {
   }, [addLog, history]);
 
   useEffect(() => {
-    let cancelled = false;
-    void sha256CanonicalText(rawGlaxSvg).then((value) => {
-      if (!cancelled) setFingerprint(value);
-    }).catch((error: unknown) => addLog(`[错误] 素材指纹计算失败：${formatError(error)}`));
-    return () => { cancelled = true; };
-  }, [addLog]);
-
-  useEffect(() => {
     if (!dirty) return;
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -215,7 +253,7 @@ export default function App() {
     };
   }, []);
 
-  const handleInit = () => {
+  const handleInit = useCallback(() => {
     if (!containerRef.current || adapterRef.current) return;
     try {
       const adapter = new SvgCanvasAdapter();
@@ -230,49 +268,145 @@ export default function App() {
     } catch (error: unknown) {
       addLog(`[错误] 画布初始化失败：${formatError(error)}`);
     }
+  }, [addLog]);
+
+  useEffect(() => {
+    handleInit();
+  }, [handleInit]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!("__TAURI_INTERNALS__" in window)) {
+      setHostReady(true);
+      return;
+    }
+    void createTauriMotionEditorHost().then(async (createdHost) => {
+      const [recent, recoveries] = await Promise.all([
+        createdHost.listRecentProjects(),
+        createdHost.readRecoveryCandidates(),
+      ]);
+      if (cancelled) return;
+      setHost(createdHost);
+      setRecentProjects(recent);
+      setRecoveryCandidates(recoveries);
+      addLog(`[信息] Tauri 项目宿主已连接${recoveries.length ? `，发现 ${recoveries.length} 个恢复项` : ""}`);
+    }).catch((error: unknown) => {
+      if (!cancelled) addLog(`[错误] Tauri 项目宿主初始化失败：${formatError(error)}`);
+    }).finally(() => {
+      if (!cancelled) setHostReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [addLog]);
+
+  const mayReplaceProject = () => !dirty || window.confirm("当前项目有未保存的修改，确定替换吗？");
+
+  const applyOpenedProject = async (
+    snapshot: MotionEditorProjectSnapshot,
+    options: { root: string | null; savedSignature?: string; recovered?: boolean },
+  ) => {
+    const adapter = adapterRef.current;
+    if (!adapter) throw new Error("画布尚未初始化");
+    await parseV1Project({
+      artwork: snapshot.artwork,
+      artworkSource: snapshot.rig.artwork.source,
+      rig: snapshot.rig,
+      motions: snapshot.motions,
+    });
+    const opened = await openV1Project(adapter, {
+      artwork: snapshot.artwork,
+      artworkSource: snapshot.rig.artwork.source,
+      rig: snapshot.rig,
+      motions: snapshot.motions,
+    });
+    const bound = adapter.bindRig(opened.rig);
+    stopAnimation();
+    setArtwork(opened.artwork);
+    setFingerprint(opened.fingerprint);
+    setManifest(snapshot.manifest);
+    setProjectRoot(options.root);
+    setSavedHostSignature(options.savedSignature ?? await sha256Text(projectDocumentText(snapshot)));
+    setDiagnostics(bound.diagnostics);
+    setImportResult(bound);
+    const nextHistory = createEditorHistory({ rig: opened.rig, motions: opened.motions });
+    setHistory(options.recovered ? { ...nextHistory, savedSignature: `recovery:${Date.now()}` } : nextHistory);
+    const firstClipId = snapshot.editor.activeClipId && opened.motions.clips.some((clip) => clip.id === snapshot.editor.activeClipId)
+      ? snapshot.editor.activeClipId
+      : opened.motions.clips[0]?.id ?? null;
+    setActiveClipId(firstClipId);
+    setCurrentFrame(0);
+    setPixelsPerFrame(snapshot.editor.timelineScale ?? 8);
+    setHiddenPartIds(new Set());
+    setLockedPartIds(new Set());
+    setStagePan({ x: 0, y: 0 });
+    const firstPart = opened.motions.clips.find((clip) => clip.id === firstClipId)?.tracks[0]?.partId
+      ?? opened.rig.parts[0]?.id
+      ?? null;
+    setSelectedPartId(firstPart);
+    setSelectedKeyframes([]);
+    if (firstPart) adapter.selectPart(firstPart);
+    addLog(`[信息] 已载入 ${snapshot.manifest.displayName}：${opened.rig.parts.length} 个 Part，${opened.motions.clips.length} 个 Clip`);
   };
 
-  const mayReplaceProject = () => !dirty || window.confirm("当前项目有未导出的修改，确定替换吗？");
-
-  const handleLoadCharacter = () => {
-    const adapter = adapterRef.current;
-    if (!adapter || !fingerprint || !mayReplaceProject()) return;
+  const handleLoadCharacter = async () => {
+    if (!adapterRef.current || !mayReplaceProject()) return;
     try {
-      stopAnimation();
-      const imported = adapter.loadSvg(rawGlaxSvg);
-      setDiagnostics(imported.diagnostics);
-      if (imported.diagnostics.some((item) => item.severity === "error")) {
-        throw new Error("素材导入存在 error，未建立 rig");
-      }
-      const nextRig = buildRigFromImport(imported, { source: SAMPLE_ARTWORK_NAME, fingerprint });
-      const motions: MotionLibraryV1 = { schemaVersion: 1, rigId: nextRig.rigId, clips: [] };
-      setImportResult(imported);
-      setHistory(createEditorHistory({ rig: nextRig, motions }));
-      setActiveClipId(null);
-      setCurrentFrame(0);
-      setHiddenPartIds(new Set());
-      setLockedPartIds(new Set());
-      setStagePan({ x: 0, y: 0 });
-      const firstPart = nextRig.parts[0]?.id ?? null;
-      setSelectedPartId(firstPart);
-      if (firstPart) adapter.selectPart(firstPart);
-      adapter.onPartSelected((partId) => {
-        setSelectedPartId(partId);
-        setSelectedKeyframes([]);
-      });
-      addLog(`[信息] 角色已载入：${nextRig.parts.length} 个 Part，${imported.pivotLocal.size} 个 pivot`);
+      await applyOpenedProject({
+        manifest: BUILT_IN_MANIFEST,
+        artwork: builtInArtwork,
+        rig: JSON.parse(builtInRig) as unknown,
+        motions: JSON.parse(builtInMotions) as unknown,
+        editor: { schemaVersion: 1, activeClipId: "bow", timelineScale: 8, expandedPartIds: [] },
+      } as MotionEditorProjectSnapshot, { root: null });
     } catch (error: unknown) {
-      addLog(`[错误] 载入角色失败：${formatError(error)}`);
+      addLog(`[错误] 载入内置小洛宝失败：${formatError(error)}`);
     }
   };
 
-  const handleLoadWaveExample = () => {
-    if (!rig || !history) return;
-    const wave = createWaveExample(rig).clips[0];
-    if (runCommand({ type: "clip.add", clip: wave })) {
-      setActiveClipId(wave.id);
-      setCurrentFrame(0);
-      selectPart("arm_right");
+  const openProjectRoot = async (root: string) => {
+    if (!host || !mayReplaceProject()) return;
+    setHostBusy(true);
+    try {
+      const snapshot = await host.readProject(root);
+      await applyOpenedProject(snapshot, { root });
+      setRecentProjects(await host.listRecentProjects());
+    } catch (error: unknown) {
+      addLog(`[错误] 打开项目失败：${formatError(error)}`);
+    } finally {
+      setHostBusy(false);
+    }
+  };
+
+  const chooseAndOpenProject = async () => {
+    if (!host || !mayReplaceProject()) return;
+    setHostBusy(true);
+    try {
+      const root = await host.chooseProjectDirectory();
+      if (!root) return;
+      const snapshot = await host.readProject(root);
+      await applyOpenedProject(snapshot, { root });
+      setRecentProjects(await host.listRecentProjects());
+    } catch (error: unknown) {
+      addLog(`[错误] 打开项目失败：${formatError(error)}`);
+    } finally {
+      setHostBusy(false);
+    }
+  };
+
+  const restoreRecovery = async (candidate: MotionEditorRecoverySnapshotV1) => {
+    if (!mayReplaceProject()) return;
+    setHostBusy(true);
+    try {
+      await applyOpenedProject(candidate.snapshot, {
+        root: null,
+        savedSignature: candidate.metadata.savedSignature,
+        recovered: true,
+      });
+      setRecoveryCandidates((current) => current.filter((item) => item.metadata.projectId !== candidate.metadata.projectId));
+      addLog("[提示] 已恢复自动保存副本，请另存为项目以保留修改");
+    } catch (error: unknown) {
+      addLog(`[错误] 恢复项目失败：${formatError(error)}`);
+    } finally {
+      setHostBusy(false);
     }
   };
 
@@ -595,6 +729,22 @@ export default function App() {
     if (runCommand({ type: "clip.add", clip: cloneClip(activeClip, id) })) setActiveClipId(id);
   };
 
+  const renameSelectedPart = (nextPartId: string) => {
+    if (!selectedPartId || !runCommand({ type: "rig.renamePart", partId: selectedPartId, nextPartId })) return;
+    const reconciled = reconcilePartRename({
+      selectedPartId,
+      hiddenPartIds,
+      lockedPartIds,
+      selectedKeyframes,
+      clipboard,
+    }, selectedPartId, nextPartId);
+    setSelectedPartId(reconciled.selectedPartId);
+    setHiddenPartIds(reconciled.hiddenPartIds);
+    setLockedPartIds(reconciled.lockedPartIds);
+    setSelectedKeyframes(reconciled.selectedKeyframes);
+    setClipboard(reconciled.clipboard);
+  };
+
   const renameClip = () => {
     if (!activeClip) return;
     const id = window.prompt("新的动作 ID", activeClip.id)?.trim();
@@ -629,7 +779,7 @@ export default function App() {
   const importRig = (text: string, name: string) => {
     if (!history || !importResult || !fingerprint || !mayReplaceProject()) return;
     try {
-      const nextRig = parseRigForArtwork(text, importResult, { source: SAMPLE_ARTWORK_NAME, fingerprint });
+      const nextRig = parseRigForArtwork(text, importResult, { source: manifest.files.artwork, fingerprint });
       const validation = validateMotionLibrary(history.present.motions, nextRig);
       const motions = validation.ok
         ? validation.value
@@ -657,37 +807,202 @@ export default function App() {
     }
   };
 
+  const createSnapshot = useCallback((): MotionEditorProjectSnapshot | null => {
+    if (!history || !artwork) return null;
+    return {
+      manifest: {
+        ...manifest,
+        characterRigId: history.present.rig.rigId,
+      },
+      artwork,
+      rig: history.present.rig,
+      motions: history.present.motions,
+      editor: {
+        schemaVersion: 1,
+        ...(activeClipId ? { activeClipId } : {}),
+        timelineScale: pixelsPerFrame,
+        expandedPartIds: [],
+      },
+    };
+  }, [activeClipId, artwork, history, manifest, pixelsPerFrame]);
+
+  const refreshRecentProjects = async () => {
+    if (host) setRecentProjects(await host.listRecentProjects());
+  };
+
+  const saveProject = async () => {
+    const snapshot = createSnapshot();
+    if (!host || !projectRoot || !snapshot) return;
+    setHostBusy(true);
+    try {
+      const result = await host.saveProject(projectRoot, snapshot);
+      setProjectRoot(result.root);
+      setSavedHostSignature(result.signature);
+      setHistory((current) => current ? markEditorHistorySaved(current) : current);
+      await host.discardRecovery(snapshot.manifest.projectId);
+      setRecoveryCandidates((current) => current.filter((item) => item.metadata.projectId !== snapshot.manifest.projectId));
+      await refreshRecentProjects();
+      addLog(`[信息] 项目保存成功：${result.root}`);
+    } catch (error: unknown) {
+      addLog(`[错误] 项目保存失败，修改仍标记为未保存：${formatError(error)}`);
+    } finally {
+      setHostBusy(false);
+    }
+  };
+
+  const saveProjectAs = async () => {
+    const snapshot = createSnapshot();
+    if (!host || !snapshot) return;
+    setHostBusy(true);
+    try {
+      const target = await host.chooseProjectDirectory();
+      if (!target) return;
+      const result = await host.saveProjectAs(target, snapshot);
+      setProjectRoot(result.root);
+      setSavedHostSignature(result.signature);
+      setHistory((current) => current ? markEditorHistorySaved(current) : current);
+      await host.discardRecovery(snapshot.manifest.projectId);
+      setRecoveryCandidates((current) => current.filter((item) => item.metadata.projectId !== snapshot.manifest.projectId));
+      await refreshRecentProjects();
+      addLog(`[信息] 项目另存成功：${result.root}`);
+    } catch (error: unknown) {
+      addLog(`[错误] 项目另存失败，修改仍标记为未保存：${formatError(error)}`);
+    } finally {
+      setHostBusy(false);
+    }
+  };
+
+  const preparePublish = async () => {
+    const snapshot = createSnapshot();
+    if (!host || !snapshot) return;
+    setHostBusy(true);
+    try {
+      setPublishPlan(await host.prepareProductionPublish(snapshot));
+    } catch (error: unknown) {
+      addLog(`[错误] 发布准备失败：${formatError(error)}`);
+    } finally {
+      setHostBusy(false);
+    }
+  };
+
+  const commitPublish = async () => {
+    if (!host || !publishPlan) return;
+    const plan = publishPlan;
+    setHostBusy(true);
+    try {
+      const path = await host.commitProductionPublish(plan.planId);
+      setPublishPlan(null);
+      addLog(`[信息] 正式资源发布成功：${path}`);
+    } catch (error: unknown) {
+      addLog(`[错误] 发布提交失败：${formatError(error)}`);
+    } finally {
+      setHostBusy(false);
+    }
+  };
+
+  const cancelPublish = async () => {
+    if (!host || !publishPlan) return;
+    const plan = publishPlan;
+    setPublishPlan(null);
+    try {
+      await host.cancelProductionPublish(plan.planId);
+      addLog("[信息] 已取消发布");
+    } catch (error: unknown) {
+      addLog(`[错误] 取消发布失败：${formatError(error)}`);
+    }
+  };
+
+  useEffect(() => {
+    if (!host || !dirty) return;
+    const snapshot = createSnapshot();
+    if (!snapshot) return;
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      void Promise.all([
+        sha256Text(projectDocumentText(snapshot)),
+        sha256Text(projectRoot ?? snapshot.manifest.projectId),
+      ]).then(([documentSignature, sourcePathHash]) => host.writeRecovery({
+        metadata: {
+          schemaVersion: 1,
+          projectId: snapshot.manifest.projectId,
+          sourcePathHash,
+          savedSignature: savedHostSignature || "sha256:unsaved",
+          createdAtUnixMs: Date.now(),
+          documentSignature,
+        },
+        snapshot,
+      })).then(() => {
+        if (!cancelled) addLog("[信息] recovery 已更新");
+      }).catch((error: unknown) => {
+        if (!cancelled) addLog(`[错误] recovery 写入失败：${formatError(error)}`);
+      });
+    }, RECOVERY_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [addLog, createSnapshot, dirty, host, projectRoot, savedHostSignature]);
+
   const exportProject = () => {
     if (!history) return;
     downloadText(`${history.present.rig.rigId}.rig.v1.json`, serializeRig(history.present.rig));
     downloadText(`${history.present.rig.rigId}.motions.v1.json`, serializeMotionLibrary(history.present.motions));
-    setHistory(markEditorHistorySaved(history));
-    addLog(`[信息] 已导出 rig 和 motions：${history.present.motions.clips.length} 个 Clip`);
+    addLog(`[信息] 已导出下载 rig 和 motions：${history.present.motions.clips.length} 个 Clip；下载不等同于项目保存`);
   };
 
   useEffect(() => () => {
     if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
     adapterRef.current?.dispose();
+    adapterRef.current = null;
   }, []);
 
+  const dirtyLabel = dirty
+    ? "● 未保存"
+    : projectRoot
+      ? "✓ 已保存"
+      : history
+        ? "内置项目（未保存为项目）"
+        : "尚未载入项目";
+
   return (
-    <div className="app p2-editor">
+    <div className="app p4-editor">
       <header className="toolbar">
-        <h1>小洛宝 Animation Studio — P2</h1>
+        <h1>小洛宝 Animation Studio · P4</h1>
         <div className="controls">
-          <button type="button" onClick={handleInit} disabled={!!adapterRef.current}>1. 初始化画布</button>
-          <button type="button" onClick={handleLoadCharacter} disabled={!adapterRef.current || !fingerprint}>2. 载入角色</button>
+          <button type="button" onClick={() => void handleLoadCharacter()} disabled={!adapterRef.current || hostBusy}>载入内置小洛宝</button>
+          {host && <button type="button" onClick={() => void chooseAndOpenProject()} disabled={hostBusy}>打开项目目录</button>}
+          {host && <button type="button" onClick={() => void saveProject()} disabled={!history || !projectRoot || hostBusy}>保存</button>}
+          {host && <button type="button" onClick={() => void saveProjectAs()} disabled={!history || hostBusy}>另存为</button>}
           <button type="button" onClick={() => rigInputRef.current?.click()} disabled={!rig}>导入 Rig</button>
           <button type="button" onClick={() => motionInputRef.current?.click()} disabled={!rig}>导入动作</button>
-          <button type="button" onClick={exportProject} disabled={!history}>导出项目</button>
+          <button type="button" onClick={exportProject} disabled={!history}>导出下载</button>
+          {host && <button type="button" onClick={() => void preparePublish()} disabled={!history || hostBusy}>发布到正式资源</button>}
           <button type="button" onClick={undo} disabled={!history?.past.length} aria-label="撤销">↶</button>
           <button type="button" onClick={redo} disabled={!history?.future.length} aria-label="重做">↷</button>
           <input ref={rigInputRef} type="file" accept=".json" hidden onChange={(event) => importTextFile(event, importRig)} />
           <input ref={motionInputRef} type="file" accept=".json" hidden onChange={(event) => importTextFile(event, importMotions)} />
         </div>
-        <span className={`dirty-indicator ${dirty ? "dirty" : ""}`}>{dirty ? "● 未导出" : "✓ 已保存"}</span>
+        <span className={`dirty-indicator ${dirty ? "dirty" : ""}`}>{dirtyLabel}</span>
         {canvasVersion && <span className="version">svgcanvas v{canvasVersion}</span>}
       </header>
+
+      {hostReady && recoveryCandidates.length > 0 && (
+        <section className="recovery-banner" role="status">
+          <strong>检测到未保存的 recovery</strong>
+          {recoveryCandidates.map((candidate) => (
+            <span key={candidate.metadata.projectId}>
+              {candidate.snapshot.manifest.displayName} · {new Date(candidate.metadata.createdAtUnixMs).toLocaleString()}
+              <button type="button" onClick={() => void restoreRecovery(candidate)} disabled={hostBusy}>恢复</button>
+              <button type="button" onClick={() => {
+                if (!host) return;
+                void host.discardRecovery(candidate.metadata.projectId).then(() => {
+                  setRecoveryCandidates((current) => current.filter((item) => item !== candidate));
+                }).catch((error: unknown) => addLog(`[错误] 丢弃 recovery 失败：${formatError(error)}`));
+              }}>丢弃</button>
+            </span>
+          ))}
+        </section>
+      )}
 
       <aside className="left-sidebar">
         {rig ? (
@@ -717,7 +1032,6 @@ export default function App() {
             <button type="button" onClick={renameClip} disabled={!activeClip}>改名</button>
             <button type="button" onClick={deleteClip} disabled={!activeClip}>删除</button>
           </div>
-          <button type="button" onClick={handleLoadWaveExample} disabled={!rig || !!motionLibrary?.clips.some((clip) => clip.id === "p0-wave")}>载入 P1 挥手参考</button>
           <ul className="clip-list">
             {motionLibrary?.clips.map((clip) => (
               <li key={clip.id}>
@@ -769,6 +1083,24 @@ export default function App() {
             </fieldset>
           )}
         </section>
+        {host && (
+          <section className="panel recent-projects">
+            <h2>最近项目</h2>
+            {recentProjects.length === 0 ? <p className="placeholder">暂无最近项目</p> : (
+              <ul>
+                {recentProjects.map((recent) => (
+                  <li key={recent.root}>
+                    <button type="button" title={recent.root} onClick={() => void openProjectRoot(recent.root)} disabled={hostBusy}>{recent.displayName}</button>
+                    <button type="button" aria-label={`移除最近项目 ${recent.displayName}`} onClick={() => {
+                      void host.removeRecentProject(recent.root).then(refreshRecentProjects)
+                        .catch((error: unknown) => addLog(`[错误] 移除最近项目失败：${formatError(error)}`));
+                    }}>×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </aside>
 
       <main
@@ -834,6 +1166,25 @@ export default function App() {
 
       <aside className="right-sidebar">
         {rig && (
+          <RigInspector
+            rig={rig}
+            partId={selectedPartId}
+            onRenamePart={renameSelectedPart}
+            onUpdateSourceBinding={(sourceBinding) => {
+              if (!selectedPartId) return;
+              runCommand({ type: "rig.updateSourceBinding", partId: selectedPartId, sourceBinding });
+            }}
+            onReparent={(logicalParentId) => {
+              if (!selectedPartId) return;
+              runCommand({ type: "rig.reparent", partId: selectedPartId, logicalParentId });
+            }}
+            onUpdateDefaultRenderSlot={(renderSlot) => {
+              if (!selectedPartId) return;
+              runCommand({ type: "rig.updateDefaultRenderSlot", partId: selectedPartId, renderSlot });
+            }}
+          />
+        )}
+        {rig && (
           <TransformInspector
             rig={rig}
             partId={selectedPartId}
@@ -883,6 +1234,7 @@ export default function App() {
             </div>
             <Timeline
               clip={activeClip}
+              rig={rig ?? undefined}
               selectedPartId={selectedPartId}
               currentFrame={currentFrame}
               pixelsPerFrame={pixelsPerFrame}
@@ -891,10 +1243,32 @@ export default function App() {
               onPixelsPerFrameChange={setPixelsPerFrame}
               onSelectKeyframe={selectKeyframe}
               onMoveKeyframes={moveKeyframes}
+              onAdjustKeyframes={(refs, property, delta) => {
+                runCommand({ type: "keyframe.adjustMany", refs, property, delta });
+              }}
             />
           </>
         ) : <div className="empty-timeline">新建或导入 Motion Clip 后开始制作动作</div>}
       </footer>
+
+      {publishPlan && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="publish-confirm" role="dialog" aria-modal="true" aria-labelledby="publish-title">
+            <h2 id="publish-title">确认发布正式资源</h2>
+            <p>目标目录固定为：</p>
+            <code>{publishPlan.targetDirectory}</code>
+            <dl>
+              <dt>当前 signature</dt><dd><code>{publishPlan.currentSignature}</code></dd>
+              <dt>候选 signature</dt><dd><code>{publishPlan.candidateSignature}</code></dd>
+            </dl>
+            <p className="publish-warning">提交将替换正式 rig 与 motions。请核对固定目标和 signature。</p>
+            <div className="publish-actions">
+              <button type="button" onClick={() => void cancelPublish()} disabled={hostBusy}>取消</button>
+              <button type="button" className="danger" onClick={() => void commitPublish()} disabled={hostBusy}>确认提交</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

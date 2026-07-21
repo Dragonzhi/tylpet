@@ -4,6 +4,7 @@ import type {
   MotionKeyframeV1,
   MotionLibraryV1,
   ProceduralChannel,
+  SourceBinding,
 } from "@ltypet/character-motion";
 
 export interface EditorDocument {
@@ -56,8 +57,18 @@ export type EditorCommand =
   }
   | { type: "keyframe.deleteMany"; refs: KeyframeRef[] }
   | { type: "keyframe.moveMany"; refs: KeyframeRef[]; deltaFrames: number }
+  | {
+    type: "keyframe.adjustMany";
+    refs: KeyframeRef[];
+    property: keyof Omit<MotionKeyframeV1["values"], "renderSlot">;
+    delta: number;
+  }
   | { type: "keyframe.paste"; clipId: string; targetFrame: number; clipboard: KeyframeClipboard }
-  | { type: "rig.updatePivot"; partId: string; x: number; y: number };
+  | { type: "rig.updatePivot"; partId: string; x: number; y: number }
+  | { type: "rig.renamePart"; partId: string; nextPartId: string }
+  | { type: "rig.updateSourceBinding"; partId: string; sourceBinding: SourceBinding }
+  | { type: "rig.reparent"; partId: string; logicalParentId: string | null }
+  | { type: "rig.updateDefaultRenderSlot"; partId: string; renderSlot: string };
 
 export type EditorCommandResult =
   | { ok: true; document: EditorDocument }

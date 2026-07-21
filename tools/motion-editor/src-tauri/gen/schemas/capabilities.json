@@ -1,0 +1,1 @@
+{"motion-editor-main":{"identifier":"motion-editor-main","description":"Minimal capability for the isolated Animation Studio window","local":true,"windows":["main"],"permissions":["core:default","opener:allow-reveal-item-in-dir"]}}

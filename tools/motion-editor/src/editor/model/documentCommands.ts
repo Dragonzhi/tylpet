@@ -1,4 +1,5 @@
 import {
+  computeReparentedBindMatrix,
   validateMotionLibrary,
   validateRig,
 } from "@ltypet/character-motion";
@@ -177,6 +178,44 @@ function moveMany(
   return validateDocument(nextDocument);
 }
 
+function adjustMany(
+  document: EditorDocument,
+  refs: KeyframeRef[],
+  property: keyof Omit<MotionKeyframeV1["values"], "renderSlot">,
+  delta: number,
+): EditorCommandResult {
+  if (refs.length === 0) return fail("没有选中的关键帧");
+  if (!Number.isFinite(delta) || delta === 0) return fail("关键帧微调量必须是非零有限数值");
+  const grouped = refsByTrack(refs);
+  let nextDocument = document;
+
+  for (const [key, frames] of grouped) {
+    const [clipId, partId] = key.split("\0");
+    const clip = findClip(nextDocument, clipId);
+    const track = clip?.tracks.find((candidate) => candidate.partId === partId);
+    if (!clip || !track) return fail(`找不到关键帧轨道 ${clipId}/${partId}`);
+    const selected = track.keyframes.filter((keyframe) => frames.has(keyframe.frame));
+    if (selected.length !== frames.size) return fail(`选择包含不存在的关键帧 ${clipId}/${partId}`);
+    if (selected.some((keyframe) => typeof keyframe.values[property] !== "number")) {
+      return fail(`${partId} 的所选关键帧并非都已提交 ${property}`);
+    }
+  }
+
+  for (const [key, frames] of grouped) {
+    const [clipId, partId] = key.split("\0");
+    const clip = findClip(nextDocument, clipId)!;
+    const track = clip.tracks.find((candidate) => candidate.partId === partId)!;
+    for (const keyframe of track.keyframes.filter((candidate) => frames.has(candidate.frame))) {
+      const current = keyframe.values[property] as number;
+      nextDocument = replaceClip(nextDocument, upsertKeyframe(findClip(nextDocument, clipId)!, partId, {
+        ...keyframe,
+        values: { ...keyframe.values, [property]: current + delta },
+      }, false));
+    }
+  }
+  return validateDocument(nextDocument);
+}
+
 export function applyEditorCommand(
   document: EditorDocument,
   command: EditorCommand,
@@ -244,6 +283,8 @@ export function applyEditorCommand(
         return validateDocument(deleteMany(document, command.refs));
       case "keyframe.moveMany":
         return moveMany(document, command.refs, command.deltaFrames);
+      case "keyframe.adjustMany":
+        return adjustMany(document, command.refs, command.property, command.delta);
       case "keyframe.paste": {
         let next = document;
         const clip = findClip(document, command.clipId);
@@ -277,6 +318,100 @@ export function applyEditorCommand(
             ...document.rig,
             parts: document.rig.parts.map((part) => part.id === command.partId
               ? { ...part, pivot: { x: command.x, y: command.y, space: "partLocal" } }
+              : part),
+          },
+        });
+      }
+      case "rig.renamePart": {
+        if (!document.rig.parts.some((part) => part.id === command.partId)) {
+          return fail(`找不到 Part：${command.partId}`);
+        }
+        if (command.nextPartId !== command.partId && document.rig.parts.some((part) => part.id === command.nextPartId)) {
+          return fail(`Part ID 已存在：${command.nextPartId}`);
+        }
+        return validateDocument({
+          ...document,
+          rig: {
+            ...document.rig,
+            parts: document.rig.parts.map((part) => ({
+              ...part,
+              id: part.id === command.partId ? command.nextPartId : part.id,
+              logicalParentId: part.logicalParentId === command.partId
+                ? command.nextPartId
+                : part.logicalParentId,
+            })),
+          },
+          motions: {
+            ...document.motions,
+            clips: document.motions.clips.map((clip) => ({
+              ...clip,
+              tracks: clip.tracks.map((track) => track.partId === command.partId
+                ? { ...track, partId: command.nextPartId }
+                : track),
+            })),
+          },
+        });
+      }
+      case "rig.updateSourceBinding": {
+        if (!document.rig.parts.some((part) => part.id === command.partId)) {
+          return fail(`找不到 Part：${command.partId}`);
+        }
+        return validateDocument({
+          ...document,
+          rig: {
+            ...document.rig,
+            parts: document.rig.parts.map((part) => part.id === command.partId
+              ? { ...part, sourceBinding: { ...command.sourceBinding } }
+              : part),
+          },
+        });
+      }
+      case "rig.reparent": {
+        const currentPart = document.rig.parts.find((part) => part.id === command.partId);
+        if (!currentPart) return fail(`找不到 Part：${command.partId}`);
+        if (currentPart.logicalParentId === command.logicalParentId) {
+          return { ok: true, document };
+        }
+        const reparented = computeReparentedBindMatrix(
+          document.rig,
+          command.partId,
+          command.logicalParentId,
+        );
+        if (!reparented.ok) {
+          const messages: Record<typeof reparented.reason, string> = {
+            "part-not-found": `找不到 Part：${command.partId}`,
+            "parent-not-found": `找不到父级 Part：${command.logicalParentId}`,
+            cycle: "logical parent 不能是 Part 自身或其后代",
+            "singular-parent": "新父级的世界 bind matrix 不可逆",
+            "non-finite": "reparent 产生了非有限 bind matrix",
+            "recomposition-error": "reparent 无法在容差内保持世界 bind pose",
+          };
+          return fail(messages[reparented.reason]);
+        }
+        return validateDocument({
+          ...document,
+          rig: {
+            ...document.rig,
+            parts: document.rig.parts.map((part) => part.id === command.partId
+              ? {
+                  ...part,
+                  logicalParentId: command.logicalParentId,
+                  bindMatrix: reparented.bindMatrix,
+                }
+              : part),
+          },
+        });
+      }
+      case "rig.updateDefaultRenderSlot": {
+        if (!document.rig.parts.some((part) => part.id === command.partId)) {
+          return fail(`找不到 Part：${command.partId}`);
+        }
+        return validateDocument({
+          ...document,
+          rig: {
+            ...document.rig,
+            parts: document.rig.parts.map((part) => part.id === command.partId
+              ? { ...part, defaultRenderSlot: command.renderSlot }
               : part),
           },
         });
