@@ -20,6 +20,7 @@ interface RuntimePart {
   originalSourceTransform: string | null;
   currentSlot: string;
   worldAlignment: AffineMatrix;
+  parentBindMatrix: AffineMatrix;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -171,6 +172,7 @@ export class SvgRuntimeRig {
         originalSourceTransform,
         currentSlot: definition.defaultRenderSlot,
         worldAlignment: [1, 0, 0, 1, 0, 0],
+        parentBindMatrix: [1, 0, 0, 1, 0, 0],
       });
     }
 
@@ -180,6 +182,9 @@ export class SvgRuntimeRig {
       if (!bindWorld) throw new Error(`Part ${partId} 缺少 bind world matrix`);
       const inverseBindWorld = invert(bindWorld);
       if (!inverseBindWorld) throw new Error(`Part ${partId} 的 bind world matrix 不可逆`);
+      const parent = part.authored.parentElement;
+      if (!hasCtm(parent)) throw new Error(`Part ${partId} 的 wrapper 父节点不支持 CTM`);
+      part.parentBindMatrix = getCtm(parent);
       // Preserve the artwork bind pose while decoupling semantic inheritance
       // from the source DOM ancestry and render-slot containers.
       part.worldAlignment = multiply(getCtm(part.authored), inverseBindWorld);
@@ -196,25 +201,44 @@ export class SvgRuntimeRig {
       );
     }
 
-    this.projectWorldMatrices(resolveAllPoses(pose.transforms, this.rig).worldMatrices);
+    const controlledParts = this.collectControlledParts(clip);
+    this.projectWorldMatrices(
+      resolveAllPoses(pose.transforms, this.rig).worldMatrices,
+      controlledParts,
+    );
     for (const [partId, value] of pose.transforms) {
       this.parts.get(partId)?.authored.setAttribute("opacity", String(value.opacity));
     }
   }
 
-  private projectWorldMatrices(worldMatrices: Map<string, AffineMatrix>) {
+  private collectControlledParts(clip: MotionClipV1) {
+    const controlled = new Set(clip.tracks.map((track) => track.partId));
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const part of this.rig.parts) {
+        if (part.logicalParentId && controlled.has(part.logicalParentId) && !controlled.has(part.id)) {
+          controlled.add(part.id);
+          changed = true;
+        }
+      }
+    }
+    return controlled;
+  }
+
+  private projectWorldMatrices(
+    worldMatrices: Map<string, AffineMatrix>,
+    controlledParts?: ReadonlySet<string>,
+  ) {
     const partsInDomOrder = [...this.parts.values()]
       .sort((left, right) => elementDepth(left.authored) - elementDepth(right.authored));
     for (const part of partsInDomOrder) {
+      if (controlledParts && !controlledParts.has(part.definition.id)) continue;
       const worldMatrix = worldMatrices.get(part.definition.id);
       if (!worldMatrix) continue;
-      const parent = part.authored.parentElement;
-      if (!hasCtm(parent)) {
-        throw new Error(`Part ${part.definition.id} 的 wrapper 父节点不支持 CTM`);
-      }
-      const inverseParent = invert(getCtm(parent));
+      const inverseParent = invert(part.parentBindMatrix);
       if (!inverseParent) {
-        throw new Error(`Part ${part.definition.id} 的 wrapper 父节点 CTM 不可逆`);
+        throw new Error(`Part ${part.definition.id} 的 wrapper 父节点 bind CTM 不可逆`);
       }
       part.authored.setAttribute("transform", matrixAttribute(multiply(
         inverseParent,
@@ -248,7 +272,9 @@ export class SvgRuntimeRig {
         part.currentSlot = part.definition.defaultRenderSlot;
       }
     }
-    this.projectWorldMatrices(resolveAllPoses(new Map(), this.rig).worldMatrices);
+    for (const part of this.parts.values()) {
+      part.authored.setAttribute("transform", matrixAttribute(part.definition.bindMatrix));
+    }
   }
 
   dispose() {

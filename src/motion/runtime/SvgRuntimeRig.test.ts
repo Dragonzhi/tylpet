@@ -197,4 +197,52 @@ describe("SvgRuntimeRig DOM 投影", () => {
     expect(svg.querySelector("#character")!.innerHTML).toBe(originalMarkup);
     expect(svg.querySelectorAll("[data-runtime-slot]")).toHaveLength(0);
   });
+
+  it("authored 动作不会抵消外层实时鼠标跟随，恢复后也不重置跟随基准", () => {
+    document.body.innerHTML = `
+      <svg xmlns="${SVG_NS}">
+        <g id="character">
+          <g id="arm-right-follow">
+            <g id="source-parent"><path /></g>
+          </g>
+        </g>
+      </svg>`;
+    const svg = document.querySelector("svg") as unknown as SVGSVGElement;
+    const armRig = structuredClone(rig);
+    armRig.parts = [armRig.parts[0]];
+    const armClip: MotionClipV1 = {
+      id: "wave",
+      fps: 24,
+      durationFrames: 1,
+      loop: "none",
+      events: [],
+      tracks: [{
+        partId: "semantic_parent",
+        keyframes: [{ frame: 0, values: { x: 3 } }],
+      }],
+    };
+    const runtime = new SvgRuntimeRig(svg, armRig);
+    const follow = svg.querySelector("#arm-right-follow")!;
+    const authored = getWrapper(svg, "semantic_parent");
+
+    follow.setAttribute("transform", "matrix(1 0 0 1 7 0)");
+    runtime.applyFrame(armClip, 0);
+    expectTranslation(authored, 10);
+
+    runtime.restore();
+    expectTranslation(authored, 7);
+    runtime.dispose();
+  });
+
+  it("只投影 Clip 控制的 Part，不冻结未参与 wave 的跟随层", () => {
+    const svg = createSvg();
+    const runtime = new SvgRuntimeRig(svg, rig);
+    const accent = getWrapper(svg, "semantic_accent");
+    accent.setAttribute("transform", "matrix(1 0 0 1 9 0)");
+
+    runtime.applyFrame(clip, 0);
+
+    expectTranslation(accent, 9);
+    runtime.dispose();
+  });
 });
