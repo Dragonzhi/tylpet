@@ -1,0 +1,282 @@
+.bottom-editor {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid #304668;
+  background: #121e32;
+}
+
+.playback-bar {
+  height: 42px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #304668;
+}
+
+.empty-timeline {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: #8190a6;
+}
+
+.timeline-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 42px);
+}
+
+.timeline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 32px;
+  padding: 4px 10px;
+  color: #9fb0c6;
+}
+
+.timeline-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.timeline-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 5px 10px;
+  overflow: auto hidden;
+  border-top: 1px solid #273a57;
+  border-bottom: 1px solid #304668;
+  color: #9fb0c6;
+  white-space: nowrap;
+  background: #15243a;
+}
+
+.timeline-tools label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timeline-tools input[type="number"] {
+  width: 62px;
+}
+
+.timeline-tools .timeline-check input {
+  width: auto;
+  margin: 0;
+}
+
+.timeline-tool-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 0 3px;
+  background: #354b69;
+}
+
+.timeline-grid {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.timeline-labels {
+  z-index: 2;
+  overflow: hidden auto;
+  border-right: 1px solid #304668;
+  background: #17263d;
+}
+
+.timeline-ruler-label,
+.track-label,
+.frame-ruler,
+.track-row {
+  height: 25px;
+  border-bottom: 1px solid #273a57;
+}
+
+.timeline-ruler-label,
+.track-label {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.track-label.part {
+  color: #d4e3f5;
+  background: #1b2d49;
+}
+
+.track-label.part.selected {
+  box-shadow: inset 3px 0 #66b5ff;
+}
+
+.track-label.property {
+  padding-left: 24px;
+  color: #8398b5;
+  font-size: 11px;
+}
+
+.timeline-scroll {
+  position: relative;
+  overflow: auto;
+}
+
+.timeline-content {
+  position: relative;
+  min-height: 100%;
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent 7px,
+    rgb(84 111 148 / 17%) 7px,
+    rgb(84 111 148 / 17%) 8px
+  );
+}
+
+.timeline-range {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  border-inline: 1px solid rgb(101 195 225 / 75%);
+  background: rgb(61 147 183 / 9%);
+  pointer-events: none;
+}
+
+.frame-ruler {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #192b46;
+  cursor: ew-resize;
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 3px;
+  color: #8299b8;
+  font-size: 10px;
+  transform: translateX(2px);
+}
+
+.track-row {
+  position: relative;
+}
+
+.part-track {
+  background: rgb(36 59 91 / 55%);
+}
+
+.property-track {
+  background: rgb(17 28 47 / 45%);
+}
+
+.keyframe-marker {
+  position: absolute;
+  z-index: 4;
+  top: 6px;
+  width: 13px;
+  min-height: 13px;
+  height: 13px;
+  padding: 0;
+  border: 1px solid #d9efff;
+  border-radius: 1px;
+  background: #4c9ce1;
+  transform: translateX(-50%) rotate(45deg);
+  touch-action: none;
+}
+
+.keyframe-marker.selected {
+  border-color: #fff;
+  background: #ffb84d;
+  box-shadow: 0 0 0 2px rgb(255 184 77 / 30%);
+}
+
+.property-key {
+  position: absolute;
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5da9e9;
+  transform: translateX(-50%);
+}
+
+.property-key.discrete {
+  border-radius: 1px;
+  background: #b183e2;
+}
+
+.playhead {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #ff5d72;
+  pointer-events: none;
+}
+
+.playhead span {
+  position: sticky;
+  top: 0;
+  display: inline-block;
+  padding: 1px 4px;
+  color: #fff;
+  background: #d44158;
+  transform: translateX(-50%);
+}
+
+.clip-diagnostics {
+  max-height: 92px;
+  padding: 6px 10px;
+  overflow: auto;
+  border-top: 1px solid #304668;
+  background: #142137;
+}
+
+.clip-diagnostics-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clip-diagnostic-counts {
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.clip-diagnostic-counts span {
+  padding: 1px 5px;
+  border: 1px solid #385271;
+  border-radius: 8px;
+  color: #a9bdd7;
+  font-size: 10px;
+  background: #192b46;
+}
+
+.clip-diagnostics ul {
+  display: flex;
+  gap: 6px 14px;
+  margin: 5px 0 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.clip-diagnostics li {
+  font-size: 11px;
+}

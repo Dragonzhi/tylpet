@@ -1,0 +1,93 @@
+.left-sidebar,
+.right-sidebar {
+  min-height: 0;
+  overflow: auto;
+  background: #16243b;
+}
+
+.left-sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  border-right: 1px solid #304668;
+}
+
+.right-sidebar {
+  grid-column: 3;
+  grid-row: 2;
+  border-left: 1px solid #304668;
+}
+
+.panel {
+  padding: 10px;
+  border-bottom: 1px solid #2c4160;
+}
+
+.panel h2,
+.timeline-panel h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #82c8ff;
+}
+
+.placeholder {
+  color: #8190a6;
+}
+
+.part-tree,
+.part-tree ul,
+.clip-list,
+.diagnostics-section ul,
+.recent-projects ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-projects li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.recent-projects li button:first-child {
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-row {
+  display: grid;
+  grid-template-columns: 20px 25px minmax(0, 1fr) 18px 30px;
+  align-items: center;
+  min-height: 29px;
+  border-radius: 3px;
+}
+
+.part-row:hover,
+.part-row.selected {
+  background: #203a61;
+}
+
+.part-row.selected {
+  box-shadow: inset 3px 0 #69b7ff;
+}
+
+.icon-button,
+.part-name {
+  min-height: 24px;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+}
+
+.part-name {
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.pivot-badge {
+  color: #65d6c4;
+}

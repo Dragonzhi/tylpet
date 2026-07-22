@@ -1,0 +1,72 @@
+.inspector fieldset {
+  display: grid;
+  gap: 5px;
+  margin: 9px 0;
+  padding: 8px;
+  border: 1px solid #354d70;
+}
+
+.inspector legend {
+  color: #88bfe9;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.selection-caption {
+  color: #a9bdd7;
+}
+
+.insert-notice {
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid #80612d;
+  border-radius: 4px;
+  color: #ffd08a;
+  background: #352a18;
+}
+
+.rig-inspector .selection-caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rig-reparent-hint {
+  margin: 1px 0 3px;
+  color: #91a8c4;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.diagnostics-section li {
+  margin: 3px 0;
+  font-size: 12px;
+}
+
+.diag-error {
+  color: #ff8396;
+}
+
+.diag-warn {
+  color: #ffc66d;
+}
+
+.diag-info {
+  color: #7cc1ff;
+}
+
+.log {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: #9fb0c6;
+  font: 11px/1.45 "Cascadia Code", Consolas, monospace;
+}

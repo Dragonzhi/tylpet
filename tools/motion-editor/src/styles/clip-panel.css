@@ -1,0 +1,55 @@
+.clip-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.clip-actions {
+  flex-wrap: wrap;
+}
+
+.clip-list {
+  display: grid;
+  gap: 3px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.clip-list button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+}
+
+.clip-list button span {
+  color: #9db0c9;
+}
+
+.clip-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.clip-meta label {
+  display: grid;
+  gap: 3px;
+  color: #9fb0c6;
+}
+
+.procedural-channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0;
+  padding: 7px;
+  border: 1px solid #354d70;
+}
+
+.procedural-channels label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #9fb0c6;
+  font-size: 11px;
+}

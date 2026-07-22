@@ -1,0 +1,56 @@
+.modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(5 10 19 / 76%);
+}
+
+.publish-confirm {
+  width: min(660px, 100%);
+  padding: 18px;
+  border: 1px solid #4e6687;
+  border-radius: 7px;
+  background: #17263d;
+  box-shadow: 0 16px 50px rgb(0 0 0 / 55%);
+}
+
+.publish-confirm h2 {
+  margin-top: 0;
+  color: #82c8ff;
+}
+
+.publish-confirm > code,
+.publish-confirm dd code {
+  overflow-wrap: anywhere;
+  color: #b9d8f3;
+}
+
+.publish-confirm dl {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.publish-confirm dt,
+.publish-confirm dd {
+  margin: 0;
+}
+
+.publish-warning {
+  color: #ffc66d;
+}
+
+.publish-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+button.danger {
+  border-color: #a74c5b;
+  background: #7c3040;
+}

@@ -1,0 +1,68 @@
+.transform-gizmo {
+  position: absolute;
+  z-index: 15;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gizmo-bounds {
+  position: absolute;
+  border: 1px solid #67b8ff;
+  background: rgb(78 165 239 / 5%);
+  cursor: move;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.gizmo-pivot {
+  position: absolute;
+  z-index: 3;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #f15d76;
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.gizmo-rotation-line {
+  position: absolute;
+  width: 1px;
+  height: 42px;
+  border-left: 1px dashed #8fcaff;
+  transform: translateY(-42px);
+}
+
+.gizmo-handle {
+  position: absolute;
+  z-index: 4;
+  width: 14px;
+  min-height: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid #fff;
+  background: #438dd2;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.gizmo-handle.rotate {
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.gizmo-handle.scale {
+  cursor: nwse-resize;
+}
+
+.gizmo-handle.scale-x {
+  cursor: ew-resize;
+}
+
+.gizmo-handle.scale-y {
+  cursor: ns-resize;
+}

@@ -1,0 +1,41 @@
+.toolbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #304668;
+  background: #15223a;
+}
+
+.toolbar h1 {
+  margin: 0 8px 0 0;
+  font-size: 15px;
+  color: #7cc1ff;
+  white-space: nowrap;
+}
+
+.controls,
+.clip-actions,
+.playback-bar,
+.stage-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.version,
+.dirty-indicator {
+  margin-left: auto;
+  color: #8fa4c0;
+  white-space: nowrap;
+}
+
+.dirty-indicator.dirty {
+  color: #ffbf66;
+}
+
+.version {
+  margin-left: 0;
+}

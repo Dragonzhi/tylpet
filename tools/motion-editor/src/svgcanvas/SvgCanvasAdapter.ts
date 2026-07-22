@@ -61,32 +61,6 @@ export interface PreviewTransform {
   opacity: number;
 }
 
-export interface StageAdapter {
-  mount(container: HTMLElement): void;
-  getVersion(): string;
-  loadSvg(source: string): ImportResult;
-  bindRig(rig: CharacterRigV1): ImportResult;
-  selectPart(partId: string): boolean;
-  onPartSelected(listener: ((partId: string) => void) | null): void;
-  applyPreviewTransform(partId: string, transform: PreviewTransform): void;
-  restoreBindPose(partId: string): void;
-  getPivotLocal(partId: string): { x: number; y: number } | null;
-  setPivotLocal(partId: string, pivot: { x: number; y: number }): void;
-  setPartVisible(partId: string, visible: boolean): void;
-  setPartLocked(partId: string, locked: boolean): void;
-  getPartScreenGeometry(partId: string, relativeTo: HTMLElement): PartScreenGeometry | null;
-  screenDeltaToSvg(deltaX: number, deltaY: number): { x: number; y: number } | null;
-  screenDeltaToPartLocal(partId: string, deltaX: number, deltaY: number): { x: number; y: number } | null;
-  fitArtworkToViewport(): void;
-  applyRenderSlots(
-    defaultSlots: Map<string, string>,
-    overrides: Map<string, string>,
-    slotOrder: string[],
-  ): void;
-  getSerializedPreview(): string;
-  dispose(): void;
-}
-
 const DEFAULT_VIEW_BOX: [number, number, number, number] = [0, 0, 1, 1];
 
 function matrixToString(matrix: AffineMatrix): string {
@@ -151,7 +125,7 @@ function readLocalBindMatrix(
   return identity();
 }
 
-export class SvgCanvasAdapter implements StageAdapter {
+export class SvgCanvasAdapter {
   private canvas: SvgCanvas | null = null;
   private readonly partIndex = new Map<string, ImportedPartRef>();
   private readonly pivotLocal = new Map<string, { x: number; y: number }>();

@@ -40,3 +40,6 @@ package-lock.json
 Thumbs.db
 elevate.cmd
 elevate.sh
+
+# Deepwork state
+.slim/deepwork/
