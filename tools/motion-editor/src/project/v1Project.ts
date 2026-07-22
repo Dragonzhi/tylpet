@@ -9,7 +9,6 @@ import {
   type ValidationIssue,
 } from "@ltypet/character-motion";
 import type { ImportResult, ImportedPartRef } from "../svgcanvas/SvgCanvasAdapter";
-import type { StageAdapter } from "../svgcanvas/SvgCanvasAdapter";
 import {
   findSourceBindingMatches,
   inspectSvgForImport,
@@ -194,24 +193,6 @@ export async function parseV1Project(source: V1ProjectSource): Promise<Validated
     rig,
     motions: motionsValidation.value,
   };
-}
-
-export async function openV1Project(
-  adapter: StageAdapter,
-  source: V1ProjectSource,
-): Promise<ValidatedV1Project> {
-  const project = await parseV1Project(source);
-  const imported = adapter.loadSvg(project.artwork);
-  const importErrors = imported.diagnostics.filter((item) => item.severity === "error");
-  if (importErrors.length > 0) {
-    throw new Error(`SVG 舞台载入失败：${importErrors.map((item) => item.message).join("；")}`);
-  }
-  const bound = adapter.bindRig(project.rig);
-  const bindingErrors = bound.diagnostics.filter((item) => item.severity === "error");
-  if (bindingErrors.length > 0) {
-    throw new Error(`Rig 舞台绑定失败：${bindingErrors.map((item) => item.message).join("；")}`);
-  }
-  return project;
 }
 
 export function parseRigForArtwork(

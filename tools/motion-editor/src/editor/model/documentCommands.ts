@@ -37,7 +37,7 @@ function cloneTrack(track: PartTrackV1): PartTrackV1 {
   return { partId: track.partId, keyframes: track.keyframes.map(cloneKeyframe) };
 }
 
-function cloneClip(clip: MotionClipV1): MotionClipV1 {
+export function cloneClip(clip: MotionClipV1): MotionClipV1 {
   return {
     ...clip,
     tracks: clip.tracks.map(cloneTrack),

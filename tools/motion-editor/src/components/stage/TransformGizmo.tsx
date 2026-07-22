@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { TransformValue } from "@ltypet/character-motion";
-import type { PartScreenGeometry, SvgCanvasAdapter } from "../../svgcanvas/SvgCanvasAdapter";
+import type { PartScreenGeometry } from "../../svgcanvas/SvgCanvasAdapter";
 
 interface Props {
   geometry: PartScreenGeometry | null;
@@ -11,7 +11,8 @@ interface Props {
   locked: boolean;
   tool: "select" | "pivot";
   stageElement: HTMLElement | null;
-  adapter: SvgCanvasAdapter | null;
+  screenDeltaToSvg(deltaX: number, deltaY: number): { x: number; y: number } | null;
+  screenDeltaToPartLocal(partId: string, deltaX: number, deltaY: number): { x: number; y: number } | null;
   onTransformPreview(value: TransformValue): void;
   onTransformCommit(value: TransformValue): void;
   onPivotPreview(x: number, y: number): void;
@@ -43,7 +44,8 @@ export function TransformGizmo({
   locked,
   tool,
   stageElement,
-  adapter,
+  screenDeltaToSvg,
+  screenDeltaToPartLocal,
   onTransformPreview,
   onTransformCommit,
   onPivotPreview,
@@ -94,7 +96,7 @@ export function TransformGizmo({
     const dx = event.clientX - gesture.startClientX;
     const dy = event.clientY - gesture.startClientY;
     if (gesture.kind === "move") {
-      const delta = adapter?.screenDeltaToSvg(dx, dy);
+      const delta = screenDeltaToSvg(dx, dy);
       if (delta) {
         gesture.latestTransform = { ...gesture.transform, x: gesture.transform.x + delta.x, y: gesture.transform.y + delta.y };
         onTransformPreview(gesture.latestTransform);
@@ -123,7 +125,7 @@ export function TransformGizmo({
         : { ...gesture.transform, scaleY: gesture.transform.scaleY * ratio };
       onTransformPreview(gesture.latestTransform);
     } else {
-      const delta = adapter?.screenDeltaToPartLocal(partId, dx, dy);
+      const delta = screenDeltaToPartLocal(partId, dx, dy);
       if (delta) {
         gesture.latestPivot = { x: gesture.pivot.x + delta.x, y: gesture.pivot.y + delta.y };
         onPivotPreview(gesture.latestPivot.x, gesture.latestPivot.y);

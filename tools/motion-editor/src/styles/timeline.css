@@ -1,0 +1,351 @@
+/* 底部时间轴：分层表面 + 柔和网格线 + 菱形关键帧 + 发光播放头 */
+
+.bottom-editor {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+}
+
+.playback-bar {
+  height: 42px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.playback-bar > span {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-timeline {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+.timeline-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 42px);
+}
+
+.timeline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 34px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.timeline-toolbar strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timeline-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 效率工具条：浮起表面与上下内容分隔 */
+
+.timeline-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 12px;
+  overflow: auto hidden;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  background: var(--bg-raised);
+}
+
+.timeline-tools label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timeline-tools input[type="number"] {
+  width: 62px;
+}
+
+.timeline-tools .timeline-check input {
+  width: auto;
+  margin: 0;
+}
+
+.timeline-tool-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 0 4px;
+  background: var(--border-default);
+}
+
+.timeline-grid {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.timeline-labels {
+  z-index: 2;
+  overflow: hidden auto;
+  border-right: 1px solid var(--border-subtle);
+  background: #1d1f24;
+}
+
+.timeline-ruler-label,
+.track-label,
+.frame-ruler,
+.track-row {
+  height: 25px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.timeline-ruler-label,
+.track-label {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.timeline-ruler-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.track-label.part {
+  font-weight: 500;
+  color: var(--text-primary);
+  background: rgb(255 255 255 / 3%);
+}
+
+.track-label.part.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.track-label.property {
+  padding-left: 24px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.timeline-scroll {
+  position: relative;
+  overflow: auto;
+}
+
+/* 帧网格：细线每帧一条、主线与标尺刻度同节奏。
+   --ppf / --ppf-major 由 TimelineTracks 按 pixelsPerFrame 注入，
+   保证网格线与关键帧位置在任意缩放级别下严格对齐。 */
+
+.timeline-content {
+  position: relative;
+  min-height: 100%;
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--ppf-major, 40px) - 1px),
+      rgb(255 255 255 / 9%) calc(var(--ppf-major, 40px) - 1px),
+      rgb(255 255 255 / 9%) var(--ppf-major, 40px)
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--ppf, 8px) - 1px),
+      rgb(255 255 255 / 5%) calc(var(--ppf, 8px) - 1px),
+      rgb(255 255 255 / 5%) var(--ppf, 8px)
+    );
+}
+
+.timeline-range {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  border-inline: 1px solid rgb(79 140 255 / 50%);
+  background: rgb(79 140 255 / 9%);
+  pointer-events: none;
+}
+
+/* 帧标尺是 button 元素，需要抹平基础按钮样式 */
+
+.frame-ruler {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: #1d1f24;
+  box-shadow: none;
+  cursor: ew-resize;
+}
+
+.frame-ruler:hover:not(:disabled) {
+  border-color: var(--border-subtle);
+  background: #1d1f24;
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(2px);
+}
+
+.track-row {
+  position: relative;
+}
+
+.part-track {
+  background: rgb(255 255 255 / 3%);
+}
+
+.property-track {
+  background: rgb(0 0 0 / 12%);
+}
+
+/* 菱形关键帧：强调蓝 + 白描边；选中为琥珀色光晕 */
+
+.keyframe-marker {
+  position: absolute;
+  z-index: 4;
+  top: 6px;
+  width: 13px;
+  min-height: 13px;
+  height: 13px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 85%);
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(-50%) rotate(45deg);
+  touch-action: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.keyframe-marker:hover:not(:disabled) {
+  border-color: #fff;
+  background: var(--accent-hover);
+}
+
+.keyframe-marker.selected,
+.keyframe-marker.selected:hover:not(:disabled) {
+  border-color: #fff;
+  background: #f0b45c;
+  box-shadow: 0 0 0 3px rgb(240 180 92 / 28%);
+}
+
+/* 属性关键帧：小圆点；离散通道用紫色方块 */
+
+.property-key {
+  position: absolute;
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+
+.property-key.discrete {
+  border-radius: 1px;
+  background: var(--purple);
+}
+
+/* 播放头：珊瑚红细线 + 帧号标签 */
+
+.playhead {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #f2556c;
+  box-shadow: 0 0 6px rgb(242 85 108 / 40%);
+  pointer-events: none;
+}
+
+.playhead span {
+  position: sticky;
+  top: 0;
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: #d84a5f;
+  box-shadow: var(--shadow-sm);
+  transform: translateX(-50%);
+}
+
+/* 片段诊断条：计数胶囊 + 分级文字 */
+
+.clip-diagnostics {
+  max-height: 92px;
+  padding: 8px 12px;
+  overflow: auto;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+}
+
+.clip-diagnostics-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+}
+
+.clip-diagnostic-counts {
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.clip-diagnostic-counts span {
+  padding: 2px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.clip-diagnostics ul {
+  display: flex;
+  gap: 6px 14px;
+  margin: 5px 0 0;
+  padding: 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.clip-diagnostics li {
+  font-size: 11px;
+}

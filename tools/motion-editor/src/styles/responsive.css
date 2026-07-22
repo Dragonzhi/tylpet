@@ -1,0 +1,10 @@
+@media (max-width: 1050px) {
+  .app.p4-editor {
+    grid-template-columns: 210px minmax(320px, 1fr) 250px;
+  }
+
+  .toolbar h1,
+  .version {
+    display: none;
+  }
+}

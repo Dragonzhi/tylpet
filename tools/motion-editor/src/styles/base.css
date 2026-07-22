@@ -1,0 +1,268 @@
+/* ==========================================================================
+   Animation Studio 设计系统
+   简约现代暗色编辑器风格（VS Code / Figma / Spline）
+   所有组件样式引用此处变量，保持视觉一致。
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- 表面层级：越深越靠后，越亮越浮起 ---- */
+  --bg-app: #1b1d21;           /* 应用底色（最深，舞台外围） */
+  --bg-panel: #212329;         /* 侧栏、底部时间轴面板 */
+  --bg-raised: #262932;        /* 浮起表面：工具条、对话框 */
+  --bg-overlay: #2c303a;       /* 悬停/活动的控件表面 */
+  --bg-inset: #16171b;         /* 凹陷区域：输入框、日志 */
+
+  /* ---- 边框：三档透明度，分割不靠死线 ---- */
+  --border-subtle: rgb(255 255 255 / 6%);
+  --border-default: rgb(255 255 255 / 11%);
+  --border-strong: rgb(255 255 255 / 18%);
+
+  /* ---- 文本 ---- */
+  --text-primary: #e6e8ec;     /* 主要内容 */
+  --text-secondary: #a2a8b3;   /* 标签、说明 */
+  --text-muted: #6e737d;       /* 占位、弱化信息 */
+
+  /* ---- 强调色：克制的编辑器蓝 ---- */
+  --accent: #4f8cff;
+  --accent-hover: #6b9eff;
+  --accent-soft: rgb(79 140 255 / 14%);
+  --accent-ring: rgb(79 140 255 / 40%);
+
+  /* ---- 语义色 ---- */
+  --warning: #e0a13e;
+  --warning-text: #f0c37e;
+  --warning-soft: rgb(224 161 62 / 12%);
+  --warning-border: rgb(224 161 62 / 32%);
+  --danger-text: #ff8580;
+  --info: #6aa8e8;
+  --teal: #4ec9b0;
+  --purple: #a98ae0;
+
+  /* ---- 圆角 ---- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* ---- 阴影层次 ---- */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 28%);
+  --shadow-md: 0 4px 14px rgb(0 0 0 / 34%);
+  --shadow-lg: 0 14px 40px rgb(0 0 0 / 48%);
+
+  /* ---- 动效 ---- */
+  --duration-fast: 120ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-app);
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 18%) transparent;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgb(79 140 255 / 32%);
+}
+
+/* ---- 滚动条：纤细、圆角、悬停加深 ---- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 14%);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  border: 2px solid transparent;
+  background: rgb(255 255 255 / 24%);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---- 基础控件 ---- */
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: 28px;
+  padding: 4px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: linear-gradient(180deg, var(--bg-overlay), var(--bg-raised));
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: linear-gradient(180deg, #343945, var(--bg-overlay));
+}
+
+button:active:not(:disabled) {
+  background: var(--bg-raised);
+  box-shadow: none;
+}
+
+button.selected {
+  border-color: var(--accent);
+  color: var(--accent-hover);
+  background: var(--accent-soft);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 1px;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+input,
+select {
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: var(--bg-inset);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+input:focus,
+select:focus {
+  border-color: var(--accent);
+}
+
+/* ---- 滑块：细轨道 + 圆形拇指 ---- */
+
+input[type="range"] {
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 14%);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+  appearance: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: var(--accent-hover);
+  transform: scale(1.15);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 14%);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: var(--accent-hover);
+  transform: scale(1.15);
+}
+
+/* ---- 复选框 ---- */
+
+input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ---- 减少动态效果偏好 ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

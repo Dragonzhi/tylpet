@@ -1,0 +1,71 @@
+/* 片段面板：列表项做成轻量行按钮，悬停才显现 */
+
+.clip-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.clip-actions {
+  flex-wrap: wrap;
+}
+
+.clip-list {
+  display: grid;
+  gap: 4px;
+  max-height: min(360px, 50vh);
+  overflow: auto;
+}
+
+.clip-list button {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 8px;
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  text-align: left;
+  background: transparent;
+  box-shadow: none;
+}
+
+.clip-list button:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 6%);
+}
+
+.clip-list button span {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.clip-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.clip-meta label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.procedural-channels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 2%);
+}
+
+.procedural-channels label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}

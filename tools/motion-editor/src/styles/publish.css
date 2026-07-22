@@ -1,0 +1,135 @@
+/* 发布确认对话框：模态浮层 + 危险操作按钮 */
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(8 9 12 / 70%);
+  backdrop-filter: blur(3px);
+  animation: modal-fade-in 140ms ease-out;
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.publish-confirm {
+  width: min(660px, 100%);
+  padding: 20px 22px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-lg);
+  animation: modal-pop-in 160ms var(--ease-standard);
+}
+
+@keyframes modal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+.publish-confirm h2 {
+  margin-top: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.publish-confirm p {
+  color: var(--text-secondary);
+}
+
+/* 目标路径：等宽字体代码块 */
+.publish-confirm > code {
+  display: block;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+  color: #b8cfe6;
+  background: var(--bg-inset);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.publish-confirm dd code {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+  color: #b8cfe6;
+  background: var(--bg-inset);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.publish-confirm dl {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.publish-confirm dt,
+.publish-confirm dd {
+  margin: 0;
+}
+
+.publish-confirm dt {
+  color: var(--text-muted);
+}
+
+/* 变更摘要：内嵌信息卡片 */
+.publish-diff {
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 2%);
+}
+
+.publish-diff strong {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.publish-diff p {
+  margin: 4px 0 0;
+}
+
+.publish-warning {
+  color: var(--warning-text);
+}
+
+.publish-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* 危险确认按钮：实心红，与默认按钮区分 */
+
+button.danger {
+  border-color: transparent;
+  color: #fff;
+  background: linear-gradient(180deg, #d9534a, #c74339);
+}
+
+button.danger:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(180deg, #e3645b, #d24f44);
+}
+
+button.danger:active:not(:disabled) {
+  background: #bd443a;
+}

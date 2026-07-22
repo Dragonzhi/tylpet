@@ -1,0 +1,78 @@
+/* 变换 gizmo：强调色描边 + 白色握柄描边，带投影保证在任意素材上可读 */
+
+.transform-gizmo {
+  position: absolute;
+  z-index: 15;
+  inset: 0;
+  pointer-events: none;
+}
+
+.gizmo-bounds {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: rgb(79 140 255 / 7%);
+  cursor: move;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.gizmo-pivot {
+  position: absolute;
+  z-index: 3;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #f2556c;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.gizmo-rotation-line {
+  position: absolute;
+  width: 1px;
+  height: 42px;
+  border-left: 1px dashed rgb(107 158 255 / 75%);
+  transform: translateY(-42px);
+}
+
+.gizmo-handle {
+  position: absolute;
+  z-index: 4;
+  width: 14px;
+  min-height: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid #fff;
+  background: var(--accent);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 45%);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  touch-action: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.gizmo-handle:hover:not(:disabled) {
+  border-color: #fff;
+  background: var(--accent-hover);
+}
+
+.gizmo-handle.rotate {
+  border-radius: 50%;
+  cursor: grab;
+}
+
+.gizmo-handle.scale {
+  cursor: nwse-resize;
+}
+
+.gizmo-handle.scale-x {
+  cursor: ew-resize;
+}
+
+.gizmo-handle.scale-y {
+  cursor: ns-resize;
+}

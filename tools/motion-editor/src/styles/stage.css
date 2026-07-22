@@ -1,0 +1,55 @@
+/* 舞台画布区：中性深灰棋盘格 + 毛玻璃浮动工具条 */
+
+.stage-area {
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background-color: #1a1c20;
+  background-image:
+    linear-gradient(45deg, #212429 25%, transparent 25%),
+    linear-gradient(-45deg, #212429 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #212429 75%),
+    linear-gradient(-45deg, transparent 75%, #212429 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.canvas-container {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-container svg {
+  display: block;
+}
+
+/* svgcanvas 默认创建 640×480 外层，并按素材原始 33×53 CSS px 显示嵌套 SVG。
+   编辑器舞台只改变视口显示尺寸，不改写 artwork.svg 或 Part transform。 */
+.canvas-container > #svgroot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* svgcanvas 构造时生成 640×480 白色画布底（#canvasBackground > rect），
+   会在角色四周露出一块白框。编辑器舞台自带棋盘格背景，
+   此处将其设为完全透明，让角色透明区域透出舞台棋盘格。 */
+.canvas-container #canvasBackground > rect {
+  fill: transparent;
+  stroke: none;
+}
+
+.stage-tools {
+  position: absolute;
+  z-index: 20;
+  top: 10px;
+  left: 10px;
+  padding: 5px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: rgb(30 32 38 / 86%);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+}
