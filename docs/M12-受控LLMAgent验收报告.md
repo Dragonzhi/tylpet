@@ -19,6 +19,8 @@
 
 工具名和参数不会直接执行。它们先映射为 M1 `ActionRequest`，再由主窗口重新执行能力、白名单、Agent 开关、确认、频率和冷却校验，最后提交 `BehaviorScheduler`。模型只会收到调度器产生的真实 `ActionResult`。
 
+M12.1 收尾后，工具目录不再是静态常量。聊天窗口会在每轮开始前使用主窗口能力快照生成 schema：`motion` 和 `expression` 是运行时精确 enum，描述同时提供英文 ID 与中文含义；当前无能力的工具不会暴露。即使模型绕过 enum 创造参数，本地也会拒绝并把允许值作为结构化工具结果返回，便于模型自行纠正。
+
 首版明确没有 shell、文件、进程、任意网络、DOM/CSS、原始窗口坐标和通用 Tauri command。`pet_move_window` 与 `timer_cancel` 每次都需要用户在聊天窗口确认。
 
 ## 2. 自动化结果
@@ -30,12 +32,13 @@
 
 检查项：
 
-- `npm test`：36 个测试文件、417 项测试通过。
+- `npm test`：36 个测试文件、424 项测试通过。
 - `npm run build`：TypeScript 与 Vite 生产构建通过。
 - `cargo test --manifest-path src-tauri/Cargo.toml`：14 项测试通过。
 - `cargo check --manifest-path src-tauri/Cargo.toml`：通过。
 - Rust tool-call 测试覆盖 SSE 分片拼接和原生边界拒绝非白名单工具。
 - Agent 测试覆盖确定性工具闭环、未知工具、提示注入文本、确认拒绝、工具循环上限和用户中断。
+- M12.1 测试追加覆盖运行时 enum、能力缺失时隐藏工具、模型创造动作/表情 ID 后的允许值反馈，以及离线 Mock 不调用未暴露工具。
 
 ## 3. 离线 Mock 必验
 
@@ -87,7 +90,11 @@ npm run tauri dev
 http://26.70.113.57:11434/v1/chat/completions
 ```
 
-不要填写 `/api/generate`。设置正确模型名、允许外发；临时 Radmin VPN HTTP 测试还需开启“允许 HTTP 明文接口”。发送“请先招手，再简短告诉我完成了什么”，预期模型调用 `pet_play_motion`，收到结构化成功结果后再回答。若模型本身不支持 tools，它可能只返回文本，这属于模型能力限制，不代表本地调度器失效。
+不要填写 `/api/generate`。设置正确模型名、允许外发；临时 Radmin VPN HTTP 测试还需开启“允许 HTTP 明文接口”。发送“请先招手，再简短告诉我完成了什么”，预期聊天标题显示实际工具数量，模型调用 `pet_play_motion` 且参数中的 `motion` 为 `wave`，收到结构化成功结果后再回答。展开“查看模型参数”可以直接确认原始 arguments。若模型本身不支持 tools，它可能只返回文本，这属于模型能力限制，不代表本地调度器失效。
+
+再发送“做一个合适的表情回应我”。模型应从 `normal | blink | speak | sleep` 中选择；若首次创造 `happy` 等不存在的值，日志应显示允许列表，模型最多在本轮预算内重试，不得把失败伪装为已完成。
+
+表情的 `durationMs` 由本地运行时负责，到时会自动恢复 `normal`。工具 schema 与成功回执都会明确要求模型不要为恢复表情再调用一次；若模型把字段误写为 `username` 等名称，本地拒绝结果会直接指出错误字段和必需的 `expression` 字段。
 
 ## 6. 关闭阶段的判定
 

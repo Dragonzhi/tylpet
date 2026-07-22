@@ -2,9 +2,15 @@ import { useEffect, useRef } from "react";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { AGENT_LIMITS } from "../config/agent";
 import type { ActionRequest, ActionResult } from "../domain/actions/types";
-import type { AgentDispatchRequest } from "../domain/agent/types";
+import {
+  AGENT_TOOL_PROTOCOL_VERSION,
+  type AgentCapabilityRequest,
+  type AgentCapabilitySnapshot,
+  type AgentDispatchRequest,
+} from "../domain/agent/types";
 import { AgentActionPolicy } from "../domain/agent/policy";
 import { PROTOCOL_VERSION } from "../domain/actions/types";
+import type { RendererCapabilities } from "../domain/capabilities/capabilities";
 import { validateActionRequest } from "../domain/validation/validate";
 import { getDefaultChannel } from "../domain/scheduler/channelPolicy";
 import type { SchedulerEvent } from "../domain/scheduler/types";
@@ -38,12 +44,20 @@ export default function AgentRuntimeBridge({ enabled }: { enabled: boolean }) {
 
   useEffect(() => {
     capabilitiesRef.current = runtime.capabilities;
+    void emitTo("chat", "agent-capabilities-changed", createCapabilitySnapshot(runtime.capabilities))
+      .catch(() => undefined);
   }, [runtime.capabilities]);
 
   useEffect(() => {
     let active = true;
     const cleanups: Array<() => void> = [];
     const install = async () => {
+      cleanups.push(await listen<AgentCapabilityRequest>("agent-capabilities-request", (event) => {
+        void emitTo("chat", "agent-capabilities-result", {
+          requestId: event.payload.requestId,
+          snapshot: createCapabilitySnapshot(capabilitiesRef.current),
+        }).catch(() => undefined);
+      }));
       cleanups.push(await listen<AgentDispatchRequest>("agent-action-request", (event) => {
         void handleRequest(event.payload);
       }));
@@ -131,6 +145,24 @@ export default function AgentRuntimeBridge({ enabled }: { enabled: boolean }) {
   }, [runtime.scheduler]);
 
   return null;
+}
+
+function createCapabilitySnapshot(renderer: RendererCapabilities): AgentCapabilitySnapshot {
+  return {
+    protocolVersion: AGENT_TOOL_PROTOCOL_VERSION,
+    capturedAt: Date.now(),
+    capabilities: {
+      renderer: {
+        motions: [...renderer.motions],
+        expressions: [...renderer.expressions],
+        lookDirection: renderer.lookDirection,
+        outfits: [...renderer.outfits],
+      },
+      window: true,
+      timer: true,
+      speech: false,
+    },
+  };
 }
 
 function isTerminal(event: SchedulerEvent): boolean {

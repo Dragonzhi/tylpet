@@ -35,7 +35,7 @@ export class MockChatProvider implements ChatProvider {
       await streamText("好呀，动作已经处理完成。", this.chunkDelayMs, options);
       return { toolCalls: [] };
     }
-    const toolCall = request.tools ? createDeterministicToolCall(prompt) : null;
+    const toolCall = request.tools ? createDeterministicToolCall(prompt, request.tools) : null;
     if (toolCall) return { toolCalls: [toolCall] };
 
     const response = `（离线 Mock）我收到了：${prompt}`;
@@ -58,15 +58,18 @@ async function streamText(
     }
 }
 
-function createDeterministicToolCall(prompt: string): ProviderToolCall | null {
-  if (/(招手|挥手)/u.test(prompt)) {
+function createDeterministicToolCall(
+  prompt: string,
+  tools: NonNullable<ChatProviderRequest["tools"]>,
+): ProviderToolCall | null {
+  if (/(招手|挥手)/u.test(prompt) && toolAllowsEnumValue(tools, "pet_play_motion", "motion", "wave")) {
     return toolCall("mock-wave", "pet_play_motion", { motion: "wave", speed: 1 });
   }
-  if (/(右边|右侧)/u.test(prompt) && /(移动|过去|去)/u.test(prompt)) {
+  if (/(右边|右侧)/u.test(prompt) && /(移动|过去|去)/u.test(prompt) && hasTool(tools, "pet_move_window")) {
     return toolCall("mock-move", "pet_move_window", { position: "right", durationMs: 800 });
   }
   const minutes = prompt.match(/(\d+)\s*分钟/u)?.[1];
-  if (minutes && /(计时|专注|番茄)/u.test(prompt)) {
+  if (minutes && /(计时|专注|番茄)/u.test(prompt) && hasTool(tools, "timer_start")) {
     return toolCall("mock-timer", "timer_start", {
       durationMinutes: Number(minutes),
       label: "小洛宝计时",
@@ -74,6 +77,25 @@ function createDeterministicToolCall(prompt: string): ProviderToolCall | null {
     });
   }
   return null;
+}
+
+function hasTool(tools: NonNullable<ChatProviderRequest["tools"]>, name: string): boolean {
+  return tools.some((tool) => tool.function.name === name);
+}
+
+function toolAllowsEnumValue(
+  tools: NonNullable<ChatProviderRequest["tools"]>,
+  name: string,
+  parameter: string,
+  value: string,
+): boolean {
+  const tool = tools.find((candidate) => candidate.function.name === name);
+  const properties = tool?.function.parameters.properties;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) return false;
+  const schema = (properties as Record<string, unknown>)[parameter];
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return false;
+  const values = (schema as Record<string, unknown>).enum;
+  return Array.isArray(values) && values.includes(value);
 }
 
 function toolCall(id: string, name: string, args: Record<string, unknown>): ProviderToolCall {

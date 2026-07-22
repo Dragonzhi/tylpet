@@ -1,5 +1,6 @@
 import type { ActionRequest, ActionResult, ActionType } from "../actions/types";
 import type { ProviderToolCall } from "../chat/types";
+import type { CapabilitySet } from "../capabilities/capabilities";
 
 export const AGENT_TOOL_PROTOCOL_VERSION = 1 as const;
 
@@ -22,6 +23,25 @@ export interface AgentDispatchRequest {
 export interface AgentDispatchResponse {
   requestId: string;
   result: ActionResult;
+}
+
+/**
+ * 主窗口在某一时刻公布给聊天窗口的真实能力快照。
+ * Agent turn 必须固定使用启动时的快照，避免一轮中途 schema 变化。
+ */
+export interface AgentCapabilitySnapshot {
+  protocolVersion: typeof AGENT_TOOL_PROTOCOL_VERSION;
+  capturedAt: number;
+  capabilities: CapabilitySet;
+}
+
+export interface AgentCapabilityRequest {
+  requestId: string;
+}
+
+export interface AgentCapabilityResponse {
+  requestId: string;
+  snapshot: AgentCapabilitySnapshot;
 }
 
 export interface AgentToolExecution {

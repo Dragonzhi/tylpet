@@ -12,9 +12,9 @@ import {
 } from "../domain/chat/types";
 import { AGENT_LIMITS } from "../config/agent";
 import { AgentTurnError, runAgentTurn } from "../domain/agent/turn";
-import { describeActionForConfirmation } from "../domain/agent/tools";
+import { createAgentToolDefinitions, describeActionForConfirmation } from "../domain/agent/tools";
 import type { ActionRequest } from "../domain/actions/types";
-import type { AgentToolExecution } from "../domain/agent/types";
+import type { AgentCapabilitySnapshot, AgentToolExecution } from "../domain/agent/types";
 import { TauriAgentActionClient } from "../controllers/TauriAgentActionClient";
 import { MockChatProvider } from "../providers/MockChatProvider";
 import { TauriOpenAICompatibleProvider } from "../providers/TauriOpenAICompatibleProvider";
@@ -32,6 +32,8 @@ export default function ChatWindow() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<string | null>(null);
   const [toolExecutions, setToolExecutions] = useState<AgentToolExecution[]>([]);
+  const [agentCapabilities, setAgentCapabilities] = useState<AgentCapabilitySnapshot | null>(null);
+  const [capabilitySyncError, setCapabilitySyncError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -70,6 +72,33 @@ export default function ChatWindow() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    const controller = new AbortController();
+    const acceptSnapshot = (snapshot: AgentCapabilitySnapshot) => {
+      if (!active) return;
+      setAgentCapabilities(snapshot);
+      setCapabilitySyncError(null);
+    };
+    const install = async () => {
+      unlisten = await listen<AgentCapabilitySnapshot>("agent-capabilities-changed", (event) => {
+        acceptSnapshot(event.payload);
+      });
+      acceptSnapshot(await actionClientRef.current.getCapabilities(controller.signal));
+    };
+    void install().catch((caught: unknown) => {
+      if (active && !controller.signal.aborted) {
+        setCapabilitySyncError(caught instanceof Error ? caught.message : String(caught));
+      }
+    });
+    return () => {
+      active = false;
+      controller.abort();
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
     if (settings && !settings.agent.enabled && runningRequestId) abortRef.current?.abort();
   }, [settings, runningRequestId]);
 
@@ -85,6 +114,9 @@ export default function ChatWindow() {
   const isExternal = provider.external;
   const insecureHttp = isExternal && requiresInsecureHttpOptIn(settings.agent.endpoint);
   const canSend = input.trim().length > 0 && runningRequestId === null;
+  const enabledToolCount = agentCapabilities
+    ? createAgentToolDefinitions(agentCapabilities).length
+    : 0;
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -101,6 +133,19 @@ export default function ChatWindow() {
     if (insecureHttp && !settings.agent.allowInsecureHttp) {
       setError("这是远程 HTTP 明文接口。请先在设置中开启“允许 HTTP 明文接口”。");
       return;
+    }
+    let turnCapabilities = agentCapabilities;
+    if (settings.agent.enabled && !turnCapabilities) {
+      try {
+        turnCapabilities = await actionClientRef.current.getCapabilities(new AbortController().signal);
+        setAgentCapabilities(turnCapabilities);
+        setCapabilitySyncError(null);
+      } catch (caught) {
+        const reason = caught instanceof Error ? caught.message : String(caught);
+        setCapabilitySyncError(reason);
+        setError(`角色能力尚未同步：${reason}`);
+        return;
+      }
     }
 
     const userMessage: ChatMessage = {
@@ -132,6 +177,7 @@ export default function ChatWindow() {
         await runAgentTurn({
           provider,
           messages: providerMessages,
+          capabilitySnapshot: turnCapabilities!,
           limits: AGENT_LIMITS,
           signal: controller.signal,
           onDelta,
@@ -201,7 +247,13 @@ export default function ChatWindow() {
           <h1>与小洛宝对话</h1>
           <p>{provider.id === "mock" ? "离线 Mock · 不会联网" : `外部模型 · ${settings.agent.model || "未配置模型"}`}</p>
           <span className={settings.agent.enabled ? "agent-state enabled" : "agent-state"}>
-            {settings.agent.enabled ? "Agent 工具已启用" : "纯文本对话"}
+            {settings.agent.enabled
+              ? agentCapabilities
+                ? `Agent 工具已启用 · ${enabledToolCount} 项`
+                : capabilitySyncError
+                  ? "Agent 能力同步失败"
+                  : "Agent 能力同步中…"
+              : "纯文本对话"}
           </span>
         </div>
         <button type="button" className="chat-secondary" onClick={() => void invoke("open_settings")}>设置</button>
@@ -235,11 +287,17 @@ export default function ChatWindow() {
       {toolExecutions.length > 0 && (
         <div className="agent-tool-log" aria-live="polite">
           {toolExecutions.map((execution) => (
-            <div key={execution.toolCall.id}>
-              <code>{execution.toolCall.function.name}</code>
-              <span className={execution.result.status === "completed" ? "ok" : "failed"}>
-                {execution.result.status === "completed" ? "已完成" : `未执行：${execution.result.reason ?? execution.result.errorCode ?? execution.result.status}`}
-              </span>
+            <div className="agent-tool-entry" key={execution.toolCall.id}>
+              <div className="agent-tool-summary">
+                <code>{execution.toolCall.function.name}</code>
+                <span className={execution.result.status === "completed" ? "ok" : "failed"}>
+                  {execution.result.status === "completed" ? "已完成" : `未执行：${execution.result.reason ?? execution.result.errorCode ?? execution.result.status}`}
+                </span>
+              </div>
+              <details>
+                <summary>查看模型参数</summary>
+                <pre>{formatToolArguments(execution.toolCall.function.arguments)}</pre>
+              </details>
             </div>
           ))}
         </div>
@@ -309,5 +367,13 @@ function requiresInsecureHttpOptIn(endpoint: string): boolean {
       && !["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
   } catch {
     return false;
+  }
+}
+
+function formatToolArguments(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw || "（空参数）";
   }
 }

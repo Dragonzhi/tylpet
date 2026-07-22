@@ -36,10 +36,14 @@ button, textarea { font: inherit; }
 .chat-message.user p { background: #3c9187; border-color: #3c9187; color: #fff; }
 .chat-error { margin: 0 20px 8px; padding: 8px 10px; border-radius: 7px; background: #fff0f0; border: 1px solid #f0b3b3; color: #9b2c2c; font-size: 12px; }
 .agent-tool-log { display: grid; gap: 6px; margin: 0 20px 8px; padding: 9px 11px; border: 1px solid #dce9e7; border-radius: 9px; background: #f9fcfb; font-size: 12px; }
-.agent-tool-log > div { display: flex; justify-content: space-between; gap: 12px; }
+.agent-tool-entry { display: grid; gap: 4px; }
+.agent-tool-summary { display: flex; justify-content: space-between; gap: 12px; }
 .agent-tool-log code { color: #476d68; }
 .agent-tool-log .ok { color: #28796f; }
 .agent-tool-log .failed { color: #a84848; text-align: right; }
+.agent-tool-log details { color: #718985; }
+.agent-tool-log summary { width: max-content; cursor: pointer; font-size: 11px; }
+.agent-tool-log pre { overflow: auto; max-height: 120px; margin: 5px 0 0; padding: 7px; border-radius: 6px; background: #edf5f3; color: #355b56; font: 11px/1.45 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .agent-confirmation { margin: 0 20px 10px; padding: 12px; border: 1px solid #e5b956; border-radius: 10px; background: #fff8e7; }
 .agent-confirmation p { margin: 6px 0 11px; color: #795715; }
 .agent-confirmation > div { display: flex; justify-content: flex-end; gap: 8px; }
