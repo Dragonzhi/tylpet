@@ -19,6 +19,8 @@ button, textarea { font: inherit; }
 .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 12px; }
 .chat-header h1 { margin: 0; font-size: 20px; }
 .chat-header p { margin: 4px 0 0; color: #63807c; font-size: 12px; }
+.agent-state { display: inline-flex; margin-top: 6px; padding: 2px 8px; border-radius: 999px; background: #e5eceb; color: #6f8582; font-size: 11px; }
+.agent-state.enabled { background: #d7f3ed; color: #26756c; }
 .chat-secondary { border: 1px solid #b7d8d3; background: #fff; color: #256c64; border-radius: 8px; padding: 7px 12px; cursor: pointer; }
 
 .chat-disclosure { margin: 0 20px 12px; padding: 9px 11px; border-radius: 8px; background: #e0f3ef; color: #376d67; font-size: 12px; line-height: 1.5; }
@@ -33,6 +35,14 @@ button, textarea { font: inherit; }
 .chat-message.user > span { text-align: right; }
 .chat-message.user p { background: #3c9187; border-color: #3c9187; color: #fff; }
 .chat-error { margin: 0 20px 8px; padding: 8px 10px; border-radius: 7px; background: #fff0f0; border: 1px solid #f0b3b3; color: #9b2c2c; font-size: 12px; }
+.agent-tool-log { display: grid; gap: 6px; margin: 0 20px 8px; padding: 9px 11px; border: 1px solid #dce9e7; border-radius: 9px; background: #f9fcfb; font-size: 12px; }
+.agent-tool-log > div { display: flex; justify-content: space-between; gap: 12px; }
+.agent-tool-log code { color: #476d68; }
+.agent-tool-log .ok { color: #28796f; }
+.agent-tool-log .failed { color: #a84848; text-align: right; }
+.agent-confirmation { margin: 0 20px 10px; padding: 12px; border: 1px solid #e5b956; border-radius: 10px; background: #fff8e7; }
+.agent-confirmation p { margin: 6px 0 11px; color: #795715; }
+.agent-confirmation > div { display: flex; justify-content: flex-end; gap: 8px; }
 .chat-composer { padding: 12px 20px 16px; border-top: 1px solid #dce9e7; background: rgba(255, 255, 255, .94); }
 .chat-composer textarea { display: block; width: 100%; resize: vertical; min-height: 68px; max-height: 180px; border: 1px solid #b9d1ce; border-radius: 10px; padding: 10px 11px; outline: none; background: #fff; }
 .chat-composer textarea:focus { border-color: #46978e; box-shadow: 0 0 0 3px rgba(70, 151, 142, .13); }

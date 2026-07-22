@@ -4,7 +4,7 @@ use futures_util::StreamExt;
 use reqwest::{Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Emitter, State};
@@ -23,13 +23,33 @@ pub struct ChatManager {
 pub struct ChatMessage {
     role: ChatRole,
     content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<ProviderToolCall>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
 enum ChatRole {
+    System,
     User,
     Assistant,
+    Tool,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProviderToolCall {
+    id: String,
+    #[serde(rename = "type")]
+    kind: String,
+    function: ProviderFunctionCall,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProviderFunctionCall {
+    name: String,
+    arguments: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +59,8 @@ pub struct ChatStartRequest {
     endpoint: String,
     model: String,
     messages: Vec<ChatMessage>,
+    #[serde(default)]
+    tools: Option<Vec<serde_json::Value>>,
     timeout_ms: u64,
     max_retries: u8,
     allow_insecure_http: bool,
@@ -70,6 +92,8 @@ struct ChatStreamEvent {
     #[serde(skip_serializing_if = "Option::is_none")]
     delta: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<ProviderToolCall>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<ChatError>,
 }
 
@@ -79,15 +103,21 @@ impl ChatStreamEvent {
             request_id: request_id.to_string(),
             event_type: "delta",
             delta: Some(delta),
+            tool_calls: None,
             error: None,
         }
     }
 
-    fn done(request_id: &str) -> Self {
+    fn done(request_id: &str, tool_calls: Vec<ProviderToolCall>) -> Self {
         Self {
             request_id: request_id.to_string(),
             event_type: "done",
             delta: None,
+            tool_calls: if tool_calls.is_empty() {
+                None
+            } else {
+                Some(tool_calls)
+            },
             error: None,
         }
     }
@@ -97,6 +127,7 @@ impl ChatStreamEvent {
             request_id: request_id.to_string(),
             event_type: "error",
             delta: None,
+            tool_calls: None,
             error: Some(error),
         }
     }
@@ -161,7 +192,42 @@ fn validate_request(request: &ChatStartRequest) -> Result<Url, ChatError> {
             false,
         ));
     }
+    if let Some(tools) = &request.tools {
+        if tools.len() > 16 {
+            return Err(ChatError::new(
+                "invalid_request",
+                "工具数量超出本地上限",
+                false,
+            ));
+        }
+        let serialized = serde_json::to_string(tools)
+            .map_err(|_| ChatError::new("invalid_request", "工具定义无法序列化", false))?;
+        if serialized.len() > 32_768 || tools.iter().any(|tool| !is_allowed_tool(tool)) {
+            return Err(ChatError::new(
+                "invalid_request",
+                "工具定义不在 M12 白名单内或体积超限",
+                false,
+            ));
+        }
+    }
     validate_endpoint(&request.endpoint, request.allow_insecure_http)
+}
+
+fn is_allowed_tool(tool: &serde_json::Value) -> bool {
+    matches!(
+        tool.pointer("/function/name")
+            .and_then(serde_json::Value::as_str),
+        Some(
+            "pet_play_motion"
+                | "pet_set_expression"
+                | "pet_set_look"
+                | "pet_move_window"
+                | "timer_start"
+                | "timer_pause"
+                | "timer_resume"
+                | "timer_cancel"
+        )
+    )
 }
 
 #[derive(Default)]
@@ -171,7 +237,16 @@ struct SseDecoder {
 
 enum DecodedEvent {
     Delta(String),
+    ToolCallDelta(ToolCallDelta),
     Done,
+}
+
+#[derive(Debug)]
+struct ToolCallDelta {
+    index: usize,
+    id: Option<String>,
+    name: Option<String>,
+    arguments: Option<String>,
 }
 
 impl SseDecoder {
@@ -208,9 +283,50 @@ impl SseDecoder {
                     events.push(DecodedEvent::Delta(delta.to_string()));
                 }
             }
+            if let Some(tool_calls) = value
+                .pointer("/choices/0/delta/tool_calls")
+                .and_then(serde_json::Value::as_array)
+            {
+                for call in tool_calls {
+                    let Some(index) = call.get("index").and_then(serde_json::Value::as_u64) else {
+                        return Err(ChatError::new(
+                            "invalid_response",
+                            "模型工具调用缺少有效 index",
+                            false,
+                        ));
+                    };
+                    events.push(DecodedEvent::ToolCallDelta(ToolCallDelta {
+                        index: index as usize,
+                        id: call
+                            .get("id")
+                            .and_then(serde_json::Value::as_str)
+                            .map(str::to_string),
+                        name: call
+                            .pointer("/function/name")
+                            .and_then(serde_json::Value::as_str)
+                            .map(str::to_string),
+                        arguments: call
+                            .pointer("/function/arguments")
+                            .and_then(serde_json::Value::as_str)
+                            .map(str::to_string),
+                    }));
+                }
+            }
         }
         Ok(events)
     }
+}
+
+#[derive(Default)]
+struct ToolCallAccumulator {
+    id: String,
+    name: String,
+    arguments: String,
+}
+
+#[derive(Default)]
+struct ChatCompletion {
+    tool_calls: Vec<ProviderToolCall>,
 }
 
 struct AttemptFailure {
@@ -224,7 +340,7 @@ async fn stream_once(
     request: &ChatStartRequest,
     endpoint: Url,
     api_key: Option<&str>,
-) -> Result<(), AttemptFailure> {
+) -> Result<ChatCompletion, AttemptFailure> {
     let client = Client::builder()
         .timeout(Duration::from_millis(request.timeout_ms))
         .build()
@@ -236,11 +352,16 @@ async fn stream_once(
             ),
             emitted_delta: false,
         })?;
-    let mut request_builder = client.post(endpoint).json(&json!({
+    let mut body = json!({
         "model": request.model,
         "messages": request.messages,
         "stream": true
-    }));
+    });
+    if let Some(tools) = &request.tools {
+        body["tools"] = json!(tools);
+        body["tool_choice"] = json!("auto");
+    }
+    let mut request_builder = client.post(endpoint).json(&body);
     if let Some(api_key) = api_key {
         request_builder = request_builder.bearer_auth(api_key);
     }
@@ -285,6 +406,7 @@ async fn stream_once(
     let mut stream = response.bytes_stream();
     let mut decoder = SseDecoder::default();
     let mut emitted_delta = false;
+    let mut tool_calls = BTreeMap::<usize, ToolCallAccumulator>::new();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|error| AttemptFailure {
             error: if error.is_timeout() {
@@ -307,13 +429,33 @@ async fn stream_once(
                         ChatStreamEvent::delta(&request.request_id, delta),
                     );
                 }
-                DecodedEvent::Done => return Ok(()),
+                DecodedEvent::ToolCallDelta(delta) => {
+                    let call = tool_calls.entry(delta.index).or_default();
+                    if let Some(id) = delta.id {
+                        call.id.push_str(&id);
+                    }
+                    if let Some(name) = delta.name {
+                        call.name.push_str(&name);
+                    }
+                    if let Some(arguments) = delta.arguments {
+                        call.arguments.push_str(&arguments);
+                    }
+                }
+                DecodedEvent::Done => {
+                    return finalize_completion(tool_calls).map_err(|error| AttemptFailure {
+                        error,
+                        emitted_delta,
+                    })
+                }
             }
         }
     }
 
-    if emitted_delta {
-        Ok(())
+    if emitted_delta || !tool_calls.is_empty() {
+        finalize_completion(tool_calls).map_err(|error| AttemptFailure {
+            error,
+            emitted_delta,
+        })
     } else {
         Err(AttemptFailure {
             error: ChatError::new("invalid_response", "模型没有返回文本内容", false),
@@ -322,13 +464,37 @@ async fn stream_once(
     }
 }
 
+fn finalize_completion(
+    calls: BTreeMap<usize, ToolCallAccumulator>,
+) -> Result<ChatCompletion, ChatError> {
+    let mut result = Vec::with_capacity(calls.len());
+    for (_, call) in calls {
+        if call.id.is_empty() || call.name.is_empty() {
+            return Err(ChatError::new(
+                "invalid_response",
+                "模型返回了不完整的工具调用",
+                false,
+            ));
+        }
+        result.push(ProviderToolCall {
+            id: call.id,
+            kind: "function".to_string(),
+            function: ProviderFunctionCall {
+                name: call.name,
+                arguments: call.arguments,
+            },
+        });
+    }
+    Ok(ChatCompletion { tool_calls: result })
+}
+
 async fn run_chat(
     app: tauri::AppHandle,
     window_label: String,
     request: ChatStartRequest,
     endpoint: Url,
     api_key: Option<String>,
-) -> Result<(), ChatError> {
+) -> Result<ChatCompletion, ChatError> {
     let mut attempt = 0u8;
     loop {
         match stream_once(
@@ -340,7 +506,7 @@ async fn run_chat(
         )
         .await
         {
-            Ok(()) => return Ok(()),
+            Ok(completion) => return Ok(completion),
             Err(failure)
                 if failure.error.retryable
                     && !failure.emitted_delta
@@ -399,11 +565,11 @@ pub fn chat_start(
             active.remove(&request_id);
         }
         match result {
-            Ok(Ok(())) => {
+            Ok(Ok(completion)) => {
                 let _ = task_app.emit_to(
                     &window_label,
                     "chat-stream",
-                    ChatStreamEvent::done(&request_id),
+                    ChatStreamEvent::done(&request_id, completion.tool_calls),
                 );
             }
             Ok(Err(error)) => {
@@ -444,7 +610,8 @@ pub fn chat_cancel(manager: State<'_, ChatManager>, request_id: String) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_endpoint, DecodedEvent, SseDecoder};
+    use super::{is_allowed_tool, validate_endpoint, DecodedEvent, SseDecoder};
+    use serde_json::json;
 
     #[test]
     fn endpoint_requires_https_except_localhost() {
@@ -478,5 +645,41 @@ mod tests {
     fn sse_decoder_rejects_invalid_json() {
         let mut decoder = SseDecoder::default();
         assert!(decoder.push(b"data: nope\n").is_err());
+    }
+
+    #[test]
+    fn sse_decoder_preserves_fragmented_tool_calls() {
+        let mut decoder = SseDecoder::default();
+        let first = decoder
+            .push(concat!(r#"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"pet_play_","arguments":"{\"motion\":"}}]}}]}"#, "\n").as_bytes())
+            .expect("first tool delta");
+        let second = decoder
+            .push(concat!(r#"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"motion","arguments":"\"wave\"}"}}]}}]}"#, "\n").as_bytes())
+            .expect("second tool delta");
+        assert!(matches!(
+            &first[0],
+            DecodedEvent::ToolCallDelta(delta)
+                if delta.index == 0
+                    && delta.id.as_deref() == Some("call_1")
+                    && delta.name.as_deref() == Some("pet_play_")
+        ));
+        assert!(matches!(
+            &second[0],
+            DecodedEvent::ToolCallDelta(delta)
+                if delta.name.as_deref() == Some("motion")
+                    && delta.arguments.as_deref() == Some("\"wave\"}")
+        ));
+    }
+
+    #[test]
+    fn rust_boundary_rejects_non_whitelisted_tools() {
+        assert!(is_allowed_tool(&json!({
+            "type": "function",
+            "function": { "name": "pet_play_motion" }
+        })));
+        assert!(!is_allowed_tool(&json!({
+            "type": "function",
+            "function": { "name": "run_shell" }
+        })));
     }
 }

@@ -4,8 +4,10 @@ import {
   ChatProviderError,
   type ChatErrorCode,
   type ChatProvider,
+  type ChatProviderResponse,
   type ChatProviderRequest,
   type ChatStreamOptions,
+  type ProviderToolCall,
 } from "../domain/chat/types";
 
 interface ProviderOptions {
@@ -26,6 +28,7 @@ interface NativeChatEvent {
   requestId: string;
   eventType: "delta" | "done" | "error";
   delta?: string;
+  toolCalls?: ProviderToolCall[];
   error?: NativeChatError;
 }
 
@@ -38,13 +41,13 @@ export class TauriOpenAICompatibleProvider implements ChatProvider {
   async stream(
     request: ChatProviderRequest,
     options: ChatStreamOptions,
-  ): Promise<void> {
+  ): Promise<ChatProviderResponse> {
     if (options.signal.aborted) {
       throw new ChatProviderError("cancelled", "已停止生成");
     }
-    let settle: (() => void) | undefined;
+    let settle: ((response: ChatProviderResponse) => void) | undefined;
     let fail: ((error: ChatProviderError) => void) | undefined;
-    const completion = new Promise<void>((resolve, reject) => {
+    const completion = new Promise<ChatProviderResponse>((resolve, reject) => {
       settle = resolve;
       fail = reject;
     });
@@ -53,7 +56,7 @@ export class TauriOpenAICompatibleProvider implements ChatProvider {
       if (event.payload.eventType === "delta" && event.payload.delta) {
         options.onDelta(event.payload.delta);
       } else if (event.payload.eventType === "done") {
-        settle?.();
+        settle?.({ toolCalls: event.payload.toolCalls ?? [] });
       } else if (event.payload.eventType === "error") {
         fail?.(toProviderError(event.payload.error));
       }
@@ -72,6 +75,7 @@ export class TauriOpenAICompatibleProvider implements ChatProvider {
           endpoint: this.config.endpoint,
           model: this.config.model,
           messages: request.messages,
+          tools: request.tools,
           timeoutMs: this.config.timeoutMs,
           maxRetries: this.config.maxRetries,
           allowInsecureHttp: this.config.allowInsecureHttp,
@@ -80,7 +84,7 @@ export class TauriOpenAICompatibleProvider implements ChatProvider {
       if (options.signal.aborted) {
         await invoke("chat_cancel", { requestId: request.requestId });
       }
-      await completion;
+      return await completion;
     } catch (error) {
       throw toProviderError(error);
     } finally {

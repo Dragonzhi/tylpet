@@ -305,8 +305,10 @@ fn timer_take_pending_finished(
 }
 
 #[tauri::command]
-fn stop_all_behaviors() -> Result<(), String> {
-    // 前端调度器在收到此命令的事件后会处理
+fn stop_all_behaviors(app: tauri::AppHandle) -> Result<(), String> {
+    app.emit_to("main", "agent-stop-all", ())
+        .map_err(|error| error.to_string())?;
+    let _ = app.emit_to("chat", "agent-stop-all", ());
     Ok(())
 }
 

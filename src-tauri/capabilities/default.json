@@ -15,6 +15,7 @@
     "core:menu:allow-popup",
     "core:menu:allow-items",
     "global-shortcut:allow-register",
-    "core:event:allow-listen"
+    "core:event:allow-listen",
+    "core:event:allow-emit-to"
   ]
 }

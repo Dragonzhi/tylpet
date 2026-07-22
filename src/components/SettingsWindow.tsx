@@ -456,7 +456,7 @@ export default function SettingsWindow() {
             />
           </Row>
           <p style={hintStyle}>
-            此开关预留给 M12。M11 的模型对话不会获得角色或桌面控制工具。
+            开启后，模型只能调用版本化白名单语义工具；窗口移动与取消计时仍需逐次确认。不会获得 shell、文件、进程、任意网络或 DOM 权限。
           </p>
         </Section>
 

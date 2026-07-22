@@ -40,11 +40,19 @@ describe("TauriOpenAICompatibleProvider", () => {
     await vi.waitFor(() => expect(mocks.listener).toBeDefined());
     mocks.listener?.({ payload: { requestId: "other", eventType: "delta", delta: "x" } });
     mocks.listener?.({ payload: { requestId: "r1", eventType: "delta", delta: "你" } });
-    mocks.listener?.({ payload: { requestId: "r1", eventType: "done" } });
-    await promise;
+    mocks.listener?.({
+      payload: {
+        requestId: "r1",
+        eventType: "done",
+        toolCalls: [{ id: "c1", type: "function", function: { name: "pet_play_motion", arguments: "{}" } }],
+      },
+    });
+    await expect(promise).resolves.toEqual({
+      toolCalls: [{ id: "c1", type: "function", function: { name: "pet_play_motion", arguments: "{}" } }],
+    });
     expect(chunks).toEqual(["你"]);
     expect(mocks.invoke).toHaveBeenCalledWith("chat_start", {
-      request: expect.objectContaining({ allowInsecureHttp: false }),
+      request: expect.objectContaining({ allowInsecureHttp: false, tools: undefined }),
     });
     expect(mocks.unlisten).toHaveBeenCalledOnce();
   });

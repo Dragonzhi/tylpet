@@ -28,4 +28,19 @@ describe("MockChatProvider", () => {
     await expect(promise).rejects.toMatchObject({ code: "cancelled" });
     vi.useRealTimers();
   });
+
+  it("acts as a deterministic fake model when tools are provided", async () => {
+    const provider = new MockChatProvider({ chunkDelayMs: 0 });
+    const response = await provider.stream(
+      {
+        requestId: "agent-1",
+        messages: [{ role: "user", content: "请向我招手" }],
+        tools: [{ type: "function", function: { name: "pet_play_motion", description: "", parameters: {} } }],
+      },
+      { signal: new AbortController().signal, onDelta: () => undefined },
+    );
+    expect(response.toolCalls).toEqual([
+      expect.objectContaining({ function: expect.objectContaining({ name: "pet_play_motion" }) }),
+    ]);
+  });
 });

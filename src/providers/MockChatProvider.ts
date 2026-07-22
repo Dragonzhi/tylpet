@@ -1,8 +1,10 @@
 import {
   ChatProviderError,
   type ChatProvider,
+  type ChatProviderResponse,
   type ChatProviderRequest,
   type ChatStreamOptions,
+  type ProviderToolCall,
 } from "../domain/chat/types";
 
 export interface MockChatProviderOptions {
@@ -21,22 +23,61 @@ export class MockChatProvider implements ChatProvider {
   async stream(
     request: ChatProviderRequest,
     options: ChatStreamOptions,
-  ): Promise<void> {
+  ): Promise<ChatProviderResponse> {
     const prompt = [...request.messages].reverse().find((message) =>
       message.role === "user"
     )?.content.trim();
     if (!prompt) {
       throw new ChatProviderError("invalid_request", "请输入想说的话");
     }
+    const lastMessage = request.messages[request.messages.length - 1];
+    if (request.tools && lastMessage?.role === "tool") {
+      await streamText("好呀，动作已经处理完成。", this.chunkDelayMs, options);
+      return { toolCalls: [] };
+    }
+    const toolCall = request.tools ? createDeterministicToolCall(prompt) : null;
+    if (toolCall) return { toolCalls: [toolCall] };
+
     const response = `（离线 Mock）我收到了：${prompt}`;
+    await streamText(response, this.chunkDelayMs, options);
+    return { toolCalls: [] };
+  }
+}
+
+async function streamText(
+  response: string,
+  chunkDelayMs: number,
+  options: ChatStreamOptions,
+): Promise<void> {
     for (const chunk of splitText(response, 4)) {
       if (options.signal.aborted) {
         throw new ChatProviderError("cancelled", "已停止生成");
       }
-      await abortableDelay(this.chunkDelayMs, options.signal);
+      await abortableDelay(chunkDelayMs, options.signal);
       options.onDelta(chunk);
     }
+}
+
+function createDeterministicToolCall(prompt: string): ProviderToolCall | null {
+  if (/(招手|挥手)/u.test(prompt)) {
+    return toolCall("mock-wave", "pet_play_motion", { motion: "wave", speed: 1 });
   }
+  if (/(右边|右侧)/u.test(prompt) && /(移动|过去|去)/u.test(prompt)) {
+    return toolCall("mock-move", "pet_move_window", { position: "right", durationMs: 800 });
+  }
+  const minutes = prompt.match(/(\d+)\s*分钟/u)?.[1];
+  if (minutes && /(计时|专注|番茄)/u.test(prompt)) {
+    return toolCall("mock-timer", "timer_start", {
+      durationMinutes: Number(minutes),
+      label: "小洛宝计时",
+      kind: "focus",
+    });
+  }
+  return null;
+}
+
+function toolCall(id: string, name: string, args: Record<string, unknown>): ProviderToolCall {
+  return { id, type: "function", function: { name, arguments: JSON.stringify(args) } };
 }
 
 function splitText(text: string, size: number): string[] {
