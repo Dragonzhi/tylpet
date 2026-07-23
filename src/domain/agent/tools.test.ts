@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderToolCall } from "../chat/types";
 import type { AgentCapabilitySnapshot } from "./types";
-import { createAgentToolDefinitions, mapToolCallToAction } from "./tools";
+import { actionRequiresConfirmation, createAgentToolDefinitions, mapToolCallToAction } from "./tools";
 
 const SNAPSHOT: AgentCapabilitySnapshot = {
   protocolVersion: 1,
@@ -16,6 +16,7 @@ const SNAPSHOT: AgentCapabilitySnapshot = {
     window: true,
     timer: true,
     speech: true,
+    memory: true,
   },
 };
 
@@ -38,6 +39,7 @@ describe("M12 agent tools", () => {
     expect(definitions.map((tool) => tool.function.name)).toEqual([
       "pet_play_motion", "pet_set_expression", "pet_set_look", "pet_move_window",
       "pet_say",
+      "memory_propose",
       "timer_start", "timer_pause", "timer_resume", "timer_cancel",
     ]);
     expect(JSON.stringify(definitions)).not.toMatch(/shell|javascript|tauri|selector/i);
@@ -66,6 +68,7 @@ describe("M12 agent tools", () => {
         ...SNAPSHOT.capabilities,
         renderer: { motions: [], expressions: [], lookDirection: false, outfits: [] },
         timer: false,
+        memory: false,
       },
     });
     expect(definitions.map((tool) => tool.function.name)).toEqual(["pet_move_window", "pet_say"]);
@@ -90,6 +93,17 @@ describe("M12 agent tools", () => {
       ok: true,
       action: { type: "speech.say", payload: { text: "你好呀", interrupt: true } },
     });
+  });
+
+  it("maps a bounded memory proposal and always marks it as confirmable", () => {
+    expect(mapToolCallToAction(
+      call("memory_propose", { category: "preference", content: "用户不喜欢香菜", reason: "稳定饮食偏好" }),
+      mappingOptions(),
+    )).toMatchObject({
+      ok: true,
+      action: { type: "memory.propose", payload: { category: "preference", content: "用户不喜欢香菜" } },
+    });
+    expect(actionRequiresConfirmation("memory.propose")).toBe(true);
   });
 
   it("returns actionable allowed values when a model invents an enum value", () => {

@@ -202,10 +202,17 @@ fn validate_request(request: &ChatStartRequest) -> Result<Url, ChatError> {
         }
         let serialized = serde_json::to_string(tools)
             .map_err(|_| ChatError::new("invalid_request", "工具定义无法序列化", false))?;
-        if serialized.len() > 32_768 || tools.iter().any(|tool| !is_allowed_tool(tool)) {
+        if serialized.len() > 32_768 {
             return Err(ChatError::new(
                 "invalid_request",
-                "工具定义不在 M12 白名单内或体积超限",
+                "工具定义体积超出原生层上限",
+                false,
+            ));
+        }
+        if tools.iter().any(|tool| !is_allowed_tool(tool)) {
+            return Err(ChatError::new(
+                "invalid_request",
+                "工具定义包含不在 M12 白名单内的名称",
                 false,
             ));
         }
@@ -222,6 +229,8 @@ fn is_allowed_tool(tool: &serde_json::Value) -> bool {
                 | "pet_set_expression"
                 | "pet_set_look"
                 | "pet_move_window"
+                | "pet_say"
+                | "memory_propose"
                 | "timer_start"
                 | "timer_pause"
                 | "timer_resume"
@@ -676,6 +685,14 @@ mod tests {
         assert!(is_allowed_tool(&json!({
             "type": "function",
             "function": { "name": "pet_play_motion" }
+        })));
+        assert!(is_allowed_tool(&json!({
+            "type": "function",
+            "function": { "name": "pet_say" }
+        })));
+        assert!(is_allowed_tool(&json!({
+            "type": "function",
+            "function": { "name": "memory_propose" }
         })));
         assert!(!is_allowed_tool(&json!({
             "type": "function",

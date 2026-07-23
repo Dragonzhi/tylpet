@@ -60,6 +60,7 @@ export function createDefaultSettings(): PetSettings {
       enabled: false,
       includeInModelContext: false,
       bondEnabled: false,
+      proposalMode: "confirm",
     },
   };
 }

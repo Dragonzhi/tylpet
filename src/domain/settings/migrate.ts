@@ -147,6 +147,11 @@ function mergeWithDefaults(obj: Record<string, unknown>): PetSettings {
       bondEnabled: typeof memory.bondEnabled === "boolean"
         ? memory.bondEnabled
         : defaults.memory.bondEnabled,
+      proposalMode: memory.proposalMode === "off"
+        || memory.proposalMode === "confirm"
+        || memory.proposalMode === "explicit-auto"
+        ? memory.proposalMode
+        : defaults.memory.proposalMode,
     },
   };
 }

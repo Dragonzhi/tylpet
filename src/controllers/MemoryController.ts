@@ -5,6 +5,7 @@ import type {
   MemoryLoadResponse,
   MemorySnapshot,
 } from "../domain/memory/types";
+import type { MemoryProposePayload } from "../domain/actions/types";
 
 export class MemoryController {
   getSnapshot(): Promise<MemoryLoadResponse> {
@@ -14,6 +15,15 @@ export class MemoryController {
   addEntry(content: string, category: MemoryCategory): Promise<MemorySnapshot> {
     return invoke<MemorySnapshot>("memory_add_entry", {
       request: { id: createId("memory"), content, category },
+    });
+  }
+
+  acceptProposal(
+    proposal: MemoryProposePayload,
+    acceptance: "confirmed" | "explicit_request",
+  ): Promise<MemorySnapshot> {
+    return invoke<MemorySnapshot>("memory_accept_proposal", {
+      request: { id: createId("memory"), ...proposal, acceptance },
     });
   }
 

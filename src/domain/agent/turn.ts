@@ -35,6 +35,7 @@ export interface AgentTurnOptions {
   signal: AbortSignal;
   dispatch(action: ActionRequest, confirmed: boolean, signal: AbortSignal): Promise<ActionResult>;
   confirm(action: ActionRequest): Promise<boolean>;
+  requiresConfirmation?(action: ActionRequest): boolean;
   onDelta(delta: string): void;
   onToolExecution?(execution: AgentToolExecution): void;
   createId?(prefix: string): string;
@@ -166,7 +167,9 @@ export async function runAgentTurn(options: AgentTurnOptions): Promise<AgentTurn
           continue;
         }
 
-        const confirmationRequired = actionRequiresConfirmation(mapping.action.type);
+        const confirmationRequired = options.requiresConfirmation
+          ? options.requiresConfirmation(mapping.action)
+          : actionRequiresConfirmation(mapping.action.type);
         let confirmed = false;
         if (confirmationRequired) {
           pauseTurnTimeout();

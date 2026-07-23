@@ -162,6 +162,8 @@ export class PetActionExecutor implements ActionExecutor {
           }
           return { actionId: action.id, status: "completed", finishedAt: this.clock() };
         }
+        case "memory.propose":
+          return { actionId: action.id, status: "rejected", errorCode: "unsupported_action", reason: "记忆候选只能在聊天确认链路中处理", finishedAt: this.clock() };
         case "wait":
           return { actionId: action.id, status: "rejected", errorCode: "unsupported_action", reason: "wait 不应到达执行器", finishedAt: this.clock() };
       }

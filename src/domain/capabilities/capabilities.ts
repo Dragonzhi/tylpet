@@ -14,6 +14,8 @@ export interface CapabilitySet {
   window?: boolean;
   speech?: boolean;
   timer?: boolean;
+  /** 仅由聊天窗口按本轮设置临时补充，不由主窗口或插件公布。 */
+  memory?: boolean;
 }
 
 export function isActionSupported(
@@ -45,6 +47,8 @@ export function isActionSupported(
       return capabilities.window === true;
     case "speech.say":
       return capabilities.speech === true;
+    case "memory.propose":
+      return capabilities.memory === true;
     case "timer.start":
     case "timer.pause":
     case "timer.resume":

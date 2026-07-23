@@ -62,6 +62,19 @@ function createDeterministicToolCall(
   prompt: string,
   tools: NonNullable<ChatProviderRequest["tools"]>,
 ): ProviderToolCall | null {
+  const explicitMemory = extractExplicitMemory(prompt);
+  if (explicitMemory && hasTool(tools, "memory_propose")) {
+    const category = /(喜欢|不喜欢|偏好|爱吃|常用)/u.test(explicitMemory)
+      ? "preference"
+      : /(我叫|我是|住在|生日|职业)/u.test(explicitMemory)
+        ? "profile"
+        : "note";
+    return toolCall("mock-memory", "memory_propose", {
+      category,
+      content: Array.from(explicitMemory).slice(0, 300).join(""),
+      reason: "用户明确要求在后续对话中记住这项信息",
+    });
+  }
   if (/(招手|挥手)/u.test(prompt) && toolAllowsEnumValue(tools, "pet_play_motion", "motion", "wave")) {
     return toolCall("mock-wave", "pet_play_motion", { motion: "wave", speed: 1 });
   }
@@ -77,6 +90,12 @@ function createDeterministicToolCall(
     });
   }
   return null;
+}
+
+function extractExplicitMemory(prompt: string): string | null {
+  const match = prompt.match(/(?:请|帮我)?(?:记住|记一下|以后要记得)[:：，,\s]*(.+)/u);
+  const content = match?.[1]?.trim();
+  return content || null;
 }
 
 function hasTool(tools: NonNullable<ChatProviderRequest["tools"]>, name: string): boolean {

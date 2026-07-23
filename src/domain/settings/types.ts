@@ -8,7 +8,7 @@
  */
 
 /** 当前设置结构版本号 */
-export const CURRENT_SCHEMA_VERSION = 8 as const;
+export const CURRENT_SCHEMA_VERSION = 9 as const;
 
 /** 窗口位置与外观状态 */
 export interface WindowSettings {
@@ -103,6 +103,8 @@ export interface ObservationSettings {
 }
 
 /** M15 长期记忆和羁绊开关；数据本身保存在独立 memory.v1.json。 */
+export type MemoryProposalMode = "off" | "confirm" | "explicit-auto";
+
 export interface MemorySettings {
   /** 无记忆模式总开关；关闭时既不读取上下文，也不累计羁绊。 */
   enabled: boolean;
@@ -110,6 +112,8 @@ export interface MemorySettings {
   includeInModelContext: boolean;
   /** 是否按固定规则记录成功对话并增加羁绊。 */
   bondEnabled: boolean;
+  /** 模型提出候选记忆时的确认策略。 */
+  proposalMode: MemoryProposalMode;
 }
 
 /** 完整的用户设置 */

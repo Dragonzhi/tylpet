@@ -105,6 +105,16 @@ pub struct UpdateMemoryRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AcceptMemoryProposalRequest {
+    id: String,
+    category: String,
+    content: String,
+    reason: String,
+    acceptance: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecordInteractionRequest {
     interaction_id: String,
     occurred_at_ms: u64,
@@ -185,6 +195,13 @@ pub fn memory_add_entry(
         }
         let category = validate_category(&request.category)?;
         let content = validate_content(&request.content)?;
+        if snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.category == category && entry.content == content)
+        {
+            return Err("同一条记忆已经存在".to_string());
+        }
         let now = now_ms();
         snapshot.entries.push(MemoryEntry {
             id: request.id,
@@ -192,6 +209,57 @@ pub fn memory_add_entry(
             content,
             source: "user_saved".to_string(),
             reason: "用户在设置中明确保存".to_string(),
+            created_at_ms: now,
+            updated_at_ms: now,
+        });
+        Ok(())
+    })?;
+    emit_changed(&app, &snapshot);
+    Ok(snapshot)
+}
+
+#[tauri::command]
+pub fn memory_accept_proposal(
+    app: AppHandle,
+    request: AcceptMemoryProposalRequest,
+    manager: State<'_, MemoryManager>,
+) -> Result<MemorySnapshot, String> {
+    let (_, snapshot) = manager.mutate(|snapshot| {
+        if snapshot.entries.len() >= MAX_ENTRIES {
+            return Err(format!("记忆数量不能超过 {MAX_ENTRIES} 条"));
+        }
+        validate_id(&request.id)?;
+        if snapshot.entries.iter().any(|entry| entry.id == request.id) {
+            return Err("记忆 ID 已存在".to_string());
+        }
+        let category = validate_category(&request.category)?;
+        let content = validate_content(&request.content)?;
+        if snapshot
+            .entries
+            .iter()
+            .any(|entry| entry.category == category && entry.content == content)
+        {
+            return Err("同一条记忆已经存在".to_string());
+        }
+        let proposal_reason = validate_proposal_reason(&request.reason)?;
+        let now = now_ms();
+        let (source, reason) = match request.acceptance.as_str() {
+            "confirmed" => (
+                "user_confirmed_agent_proposal",
+                format!("用户确认了模型提议：{proposal_reason}"),
+            ),
+            "explicit_request" => (
+                "user_explicit_agent_proposal",
+                format!("用户明确要求记住并启用了自动保存：{proposal_reason}"),
+            ),
+            _ => return Err("记忆提议接受方式不受支持".to_string()),
+        };
+        snapshot.entries.push(MemoryEntry {
+            id: request.id,
+            category,
+            content,
+            source: source.to_string(),
+            reason,
             created_at_ms: now,
             updated_at_ms: now,
         });
@@ -445,11 +513,17 @@ fn validate_snapshot(snapshot: &MemorySnapshot) -> Result<(), String> {
         }
         validate_category(&entry.category)?;
         validate_content(&entry.content)?;
-        if entry.source != "user_saved" {
-            return Err("记忆来源不受支持".to_string());
-        }
-        if entry.reason != "用户在设置中明确保存" {
-            return Err("记忆保存原因不受支持".to_string());
+        match entry.source.as_str() {
+            "user_saved" if entry.reason == "用户在设置中明确保存" => {}
+            "user_confirmed_agent_proposal"
+                if entry.reason.starts_with("用户确认了模型提议：")
+                    && entry.reason.chars().count() <= 180 => {}
+            "user_explicit_agent_proposal"
+                if entry
+                    .reason
+                    .starts_with("用户明确要求记住并启用了自动保存：")
+                    && entry.reason.chars().count() <= 200 => {}
+            _ => return Err("记忆来源或保存原因不受支持".to_string()),
         }
     }
     for id in &snapshot.bond.recent_interaction_ids {
@@ -489,6 +563,15 @@ fn validate_content(value: &str) -> Result<String, String> {
     let count = trimmed.chars().count();
     if count == 0 || count > MAX_ENTRY_CHARS {
         return Err(format!("记忆内容必须是 1～{MAX_ENTRY_CHARS} 个字符"));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn validate_proposal_reason(value: &str) -> Result<String, String> {
+    let trimmed = value.trim();
+    let count = trimmed.chars().count();
+    if count == 0 || count > 160 {
+        return Err("提议原因必须是 1～160 个字符".to_string());
     }
     Ok(trimmed.to_string())
 }
@@ -565,6 +648,38 @@ mod tests {
         assert!(validate_category("secret").is_err());
         assert!(validate_content(" ").is_err());
         assert!(validate_content(&"a".repeat(MAX_ENTRY_CHARS + 1)).is_err());
+    }
+
+    #[test]
+    fn user_confirmed_agent_proposal_is_a_valid_auditable_source() {
+        let mut snapshot = MemorySnapshot::default();
+        snapshot.entries.push(MemoryEntry {
+            id: "proposal-1".to_string(),
+            category: "preference".to_string(),
+            content: "用户不喜欢香菜".to_string(),
+            source: "user_confirmed_agent_proposal".to_string(),
+            reason: "用户确认了模型提议：稳定饮食偏好".to_string(),
+            created_at_ms: 1,
+            updated_at_ms: 1,
+        });
+        assert!(validate_snapshot(&snapshot).is_ok());
+        snapshot.entries[0].source = "agent_silent_write".to_string();
+        assert!(validate_snapshot(&snapshot).is_err());
+    }
+
+    #[test]
+    fn explicit_request_auto_save_has_a_distinct_auditable_source() {
+        let mut snapshot = MemorySnapshot::default();
+        snapshot.entries.push(MemoryEntry {
+            id: "explicit-1".to_string(),
+            category: "note".to_string(),
+            content: "用户希望以后称呼他为阿明".to_string(),
+            source: "user_explicit_agent_proposal".to_string(),
+            reason: "用户明确要求记住并启用了自动保存：用户明确要求".to_string(),
+            created_at_ms: 1,
+            updated_at_ms: 1,
+        });
+        assert!(validate_snapshot(&snapshot).is_ok());
     }
 
     #[test]

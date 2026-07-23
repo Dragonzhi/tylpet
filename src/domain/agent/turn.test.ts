@@ -99,6 +99,35 @@ describe("runAgentTurn", () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it("lets the caller waive confirmation only through an explicit local policy", async () => {
+    const model = new FakeModel([
+      { toolCalls: [toolCall("memory_propose", { category: "note", content: "记住这件事", reason: "用户明确要求" })] },
+      { toolCalls: [] },
+    ]);
+    const dispatch = vi.fn().mockResolvedValue({ actionId: "memory-action", status: "completed", finishedAt: 1 });
+    const confirm = vi.fn().mockResolvedValue(true);
+    await runAgentTurn({
+      provider: model,
+      messages: [{ role: "user", content: "请记住这件事" }],
+      capabilitySnapshot: {
+        ...CAPABILITY_SNAPSHOT,
+        capabilities: { ...CAPABILITY_SNAPSHOT.capabilities, memory: true },
+      },
+      limits: AGENT_LIMITS,
+      signal: new AbortController().signal,
+      dispatch,
+      confirm,
+      requiresConfirmation: (action) => action.type !== "memory.propose",
+      onDelta: () => undefined,
+    });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "memory.propose" }),
+      false,
+      expect.any(AbortSignal),
+    );
+  });
+
   it("stops a looping model at the tool-step budget", async () => {
     const model = new FakeModel([{ toolCalls: [toolCall("pet_set_look", { x: 0, y: 0 })] }]);
     await expect(runAgentTurn({

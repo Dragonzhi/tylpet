@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type KeyboardEvent,
+  type SetStateAction,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import type { PetSettings } from "../domain/settings/types";
@@ -12,28 +20,32 @@ import {
 } from "../domain/chat/types";
 import { AGENT_LIMITS } from "../config/agent";
 import { AgentTurnError, runAgentTurn } from "../domain/agent/turn";
-import { createAgentToolDefinitions, describeActionForConfirmation } from "../domain/agent/tools";
-import type { ActionRequest } from "../domain/actions/types";
+import { actionRequiresConfirmation, createAgentToolDefinitions, describeActionForConfirmation } from "../domain/agent/tools";
+import type { ActionRequest, ActionResult } from "../domain/actions/types";
 import type { AgentCapabilitySnapshot, AgentToolExecution } from "../domain/agent/types";
 import { TauriAgentActionClient } from "../controllers/TauriAgentActionClient";
 import { MockChatProvider } from "../providers/MockChatProvider";
 import { TauriOpenAICompatibleProvider } from "../providers/TauriOpenAICompatibleProvider";
 import { MemoryController } from "../controllers/MemoryController";
 import { buildMemoryContext } from "../domain/memory/types";
+import type { MemoryCategory } from "../domain/memory/types";
+import { memoryProposalRequiresConfirmation } from "../domain/memory/proposalPolicy";
+import { insertBeforeItem, summarizeToolOnlyTurn, toolDisplayName } from "../domain/chat/toolTimeline";
 import "../styles/ChatWindow.css";
 
 export default function ChatWindow() {
   const [settings, setSettings] = useState<PetSettings | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatTimelineItem[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [runningRequestId, setRunningRequestId] = useState<string | null>(null);
+  const [pendingAssistantId, setPendingAssistantId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const actionClientRef = useRef(new TauriAgentActionClient());
   const confirmationRef = useRef<((allowed: boolean) => void) | null>(null);
+  const memoryProposalOverrideRef = useRef(new Map<string, Extract<ActionRequest, { type: "memory.propose" }>["payload"]>());
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [pendingConfirmation, setPendingConfirmation] = useState<string | null>(null);
-  const [toolExecutions, setToolExecutions] = useState<AgentToolExecution[]>([]);
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [agentCapabilities, setAgentCapabilities] = useState<AgentCapabilitySnapshot | null>(null);
   const [capabilitySyncError, setCapabilitySyncError] = useState<string | null>(null);
   const [memoryStatus, setMemoryStatus] = useState<string | null>(null);
@@ -60,6 +72,7 @@ export default function ChatWindow() {
       unlisten?.();
       confirmationRef.current?.(false);
       confirmationRef.current = null;
+      memoryProposalOverrideRef.current.clear();
       abortRef.current?.abort();
     };
   }, []);
@@ -69,6 +82,7 @@ export default function ChatWindow() {
     void listen("agent-stop-all", () => {
       confirmationRef.current?.(false);
       confirmationRef.current = null;
+      memoryProposalOverrideRef.current.clear();
       setPendingConfirmation(null);
       abortRef.current?.abort();
     }).then((cleanup) => { unlisten = cleanup; }).catch(() => undefined);
@@ -119,7 +133,7 @@ export default function ChatWindow() {
   const insecureHttp = isExternal && requiresInsecureHttpOptIn(settings.agent.endpoint);
   const canSend = input.trim().length > 0 && runningRequestId === null;
   const enabledToolCount = agentCapabilities
-    ? createAgentToolDefinitions(agentCapabilities).length
+    ? createAgentToolDefinitions(withMemoryCapability(agentCapabilities, memoryProposalsEnabled(settings))).length
     : 0;
 
   const submit = async (event?: FormEvent) => {
@@ -158,15 +172,16 @@ export default function ChatWindow() {
       content,
     };
     const assistantId = createId("assistant");
-    const nextMessages = [...messages, userMessage];
+    const conversationMessages = messages.filter(isTextMessage);
+    const nextMessages = [...conversationMessages, userMessage];
     const requestId = createId("request");
     const controller = new AbortController();
     abortRef.current = controller;
     setInput("");
     setError(null);
-    setToolExecutions([]);
     setRunningRequestId(requestId);
-    setMessages([...nextMessages, { id: assistantId, role: "assistant", content: "" }]);
+    setPendingAssistantId(assistantId);
+    setMessages([...messages, userMessage, { id: assistantId, role: "assistant", content: "" }]);
 
     try {
       let memoryContext: string | null = null;
@@ -192,30 +207,46 @@ export default function ChatWindow() {
       if (memoryContext) providerMessages.unshift({ role: "system", content: memoryContext });
       let assistantText = "";
       let spokeViaTool = false;
+      const turnToolExecutions: AgentToolExecution[] = [];
       const onDelta = (delta: string) => {
         assistantText += delta;
         setMessages((current) => current.map((message) =>
-          message.id === assistantId
+          message.role === "assistant" && message.id === assistantId
             ? { ...message, content: message.content + delta }
             : message
         ));
       };
       if (settings.agent.enabled) {
+        const turnSnapshot = withMemoryCapability(turnCapabilities!, memoryProposalsEnabled(settings));
         await runAgentTurn({
           provider,
           messages: providerMessages,
-          capabilitySnapshot: turnCapabilities!,
+          capabilitySnapshot: turnSnapshot,
           limits: AGENT_LIMITS,
           signal: controller.signal,
           onDelta,
-          dispatch: (action, confirmed, signal) =>
-            actionClientRef.current.dispatch(action, confirmed, signal),
+          dispatch: async (action, confirmed, signal) => {
+            if (action.type !== "memory.propose") {
+              return actionClientRef.current.dispatch(action, confirmed, signal);
+            }
+            const proposal = memoryProposalOverrideRef.current.get(action.id) ?? action.payload;
+            memoryProposalOverrideRef.current.delete(action.id);
+            return persistMemoryProposal(action.id, proposal, confirmed, settings, memoryControllerRef.current, signal, setMemoryStatus);
+          },
           confirm: requestConfirmation,
+          requiresConfirmation: (action) => action.type === "memory.propose"
+            ? memoryProposalRequiresConfirmation(settings.memory.proposalMode, content)
+            : actionRequiresConfirmation(action.type),
           onToolExecution: (execution) => {
+            turnToolExecutions.push(execution);
             if (execution.toolCall.function.name === "pet_say" && execution.result.status === "completed") {
               spokeViaTool = true;
             }
-            setToolExecutions((current) => [...current, execution]);
+            setMessages((current) => insertBeforeItem(
+              current,
+              assistantId,
+              { id: createId(`tool-${execution.toolCall.function.name}`), role: "tool", execution },
+            ));
           },
         });
       } else {
@@ -223,6 +254,15 @@ export default function ChatWindow() {
           { requestId, messages: providerMessages },
           { signal: controller.signal, onDelta },
         );
+      }
+      if (!assistantText.trim()) {
+        const fallback = summarizeToolOnlyTurn(turnToolExecutions);
+        assistantText = fallback;
+        setMessages((current) => current.map((message) =>
+          message.role === "assistant" && message.id === assistantId
+            ? { ...message, content: fallback }
+            : message
+        ));
       }
       const spokenReply = truncateSpeechText(assistantText);
       if (
@@ -253,7 +293,7 @@ export default function ChatWindow() {
         : new ChatProviderError("internal_error", String(caught));
       if (providerError.code !== "cancelled") setError(providerError.message);
       setMessages((current) => current.filter((message) =>
-        message.id !== assistantId || message.content.length > 0
+        message.role === "tool" || message.id !== assistantId || message.content.trim().length > 0
       ));
     } finally {
       abortRef.current = null;
@@ -261,6 +301,7 @@ export default function ChatWindow() {
       confirmationRef.current = null;
       setPendingConfirmation(null);
       setRunningRequestId(null);
+      setPendingAssistantId(null);
     }
   };
 
@@ -268,10 +309,23 @@ export default function ChatWindow() {
     new Promise((resolve) => {
       confirmationRef.current?.(false);
       confirmationRef.current = resolve;
-      setPendingConfirmation(describeActionForConfirmation(action));
+      setPendingConfirmation({
+        action,
+        message: describeActionForConfirmation(action),
+        proposal: action.type === "memory.propose" ? { ...action.payload } : undefined,
+      });
     });
 
   const resolveConfirmation = (allowed: boolean) => {
+    if (allowed && pendingConfirmation?.action.type === "memory.propose" && pendingConfirmation.proposal) {
+      memoryProposalOverrideRef.current.set(pendingConfirmation.action.id, {
+        ...pendingConfirmation.proposal,
+        content: pendingConfirmation.proposal.content.trim(),
+        reason: pendingConfirmation.proposal.reason.trim(),
+      });
+    } else if (pendingConfirmation) {
+      memoryProposalOverrideRef.current.delete(pendingConfirmation.action.id);
+    }
     const resolve = confirmationRef.current;
     confirmationRef.current = null;
     setPendingConfirmation(null);
@@ -337,44 +391,70 @@ export default function ChatWindow() {
           <div className="chat-empty">
             <strong>先随便说点什么吧。</strong>
             <span>{settings.agent.enabled
-              ? "可以让我招手、看向某处、移动位置或开始计时；移动与取消计时会先征求确认。"
+              ? "可以让我招手、移动、计时，或在长期体验开启时提议记住一件事；高影响动作和自主记忆提议会先征求确认。"
               : "当前是纯文本对话；在设置中开启 Agent 后才会暴露受控语义工具。"}</span>
           </div>
         )}
         {messages.map((message) => (
-          <article key={message.id} className={`chat-message ${message.role}`}>
-            <span>{message.role === "user" ? "你" : "小洛宝"}</span>
-            <p>{message.content || (runningRequestId ? "正在思考…" : "")}</p>
-          </article>
+          message.role === "tool"
+            ? <ToolTimelineBubble key={message.id} execution={message.execution} />
+            : (
+              <article key={message.id} className={`chat-message ${message.role}`}>
+                <span>{message.role === "user" ? "你" : "小洛宝"}</span>
+                <p>{message.content || (message.id === pendingAssistantId ? "正在思考…" : "")}</p>
+              </article>
+            )
         ))}
       </div>
-
-      {toolExecutions.length > 0 && (
-        <div className="agent-tool-log" aria-live="polite">
-          {toolExecutions.map((execution) => (
-            <div className="agent-tool-entry" key={execution.toolCall.id}>
-              <div className="agent-tool-summary">
-                <code>{execution.toolCall.function.name}</code>
-                <span className={execution.result.status === "completed" ? "ok" : "failed"}>
-                  {execution.result.status === "completed" ? "已完成" : `未执行：${execution.result.reason ?? execution.result.errorCode ?? execution.result.status}`}
-                </span>
-              </div>
-              <details>
-                <summary>查看模型参数</summary>
-                <pre>{formatToolArguments(execution.toolCall.function.arguments)}</pre>
-              </details>
-            </div>
-          ))}
-        </div>
-      )}
 
       {pendingConfirmation && (
         <section className="agent-confirmation" role="alertdialog" aria-label="确认 Agent 动作">
           <strong>需要你的确认</strong>
-          <p>{pendingConfirmation}</p>
+          <p>{pendingConfirmation.message}</p>
+          {pendingConfirmation.action.type === "memory.propose" && pendingConfirmation.proposal && (
+            <div className="memory-proposal-editor">
+              <label>
+                分类
+                <select
+                  value={pendingConfirmation.proposal.category}
+                  onChange={(event) => updatePendingMemoryProposal(setPendingConfirmation, {
+                    category: event.target.value as MemoryCategory,
+                  })}
+                >
+                  <option value="preference">偏好</option>
+                  <option value="profile">个人资料</option>
+                  <option value="note">备注</option>
+                </select>
+              </label>
+              <label>
+                保存内容
+                <textarea
+                  rows={2}
+                  maxLength={300}
+                  value={pendingConfirmation.proposal.content}
+                  onChange={(event) => updatePendingMemoryProposal(setPendingConfirmation, { content: event.target.value })}
+                />
+              </label>
+              <label>
+                保存原因
+                <input
+                  maxLength={160}
+                  value={pendingConfirmation.proposal.reason}
+                  onChange={(event) => updatePendingMemoryProposal(setPendingConfirmation, { reason: event.target.value })}
+                />
+              </label>
+            </div>
+          )}
           <div>
             <button type="button" className="chat-secondary" onClick={() => resolveConfirmation(false)}>拒绝</button>
-            <button type="button" className="chat-send" onClick={() => resolveConfirmation(true)}>允许这一次</button>
+            <button
+              type="button"
+              className="chat-send"
+              disabled={pendingConfirmation.action.type === "memory.propose" && (
+                !pendingConfirmation.proposal?.content.trim() || !pendingConfirmation.proposal.reason.trim()
+              )}
+              onClick={() => resolveConfirmation(true)}
+            >{pendingConfirmation.action.type === "memory.propose" ? "确认保存" : "允许这一次"}</button>
           </div>
         </section>
       )}
@@ -444,5 +524,97 @@ function formatToolArguments(raw: string): string {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
     return raw || "（空参数）";
+  }
+}
+
+function memoryProposalsEnabled(settings: PetSettings): boolean {
+  return settings.memory.enabled && settings.memory.proposalMode !== "off";
+}
+
+function withMemoryCapability(
+  snapshot: AgentCapabilitySnapshot,
+  enabled: boolean,
+): AgentCapabilitySnapshot {
+  return {
+    ...snapshot,
+    capabilities: { ...snapshot.capabilities, memory: enabled },
+  };
+}
+
+interface PendingConfirmation {
+  action: ActionRequest;
+  message: string;
+  proposal?: Extract<ActionRequest, { type: "memory.propose" }>["payload"];
+}
+
+interface ChatToolTimelineItem {
+  id: string;
+  role: "tool";
+  execution: AgentToolExecution;
+}
+
+type ChatTimelineItem = ChatMessage | ChatToolTimelineItem;
+
+function isTextMessage(message: ChatTimelineItem): message is ChatMessage {
+  return message.role !== "tool";
+}
+
+function ToolTimelineBubble({ execution }: { execution: AgentToolExecution }) {
+  const completed = execution.result.status === "completed";
+  const status = completed
+    ? "已完成"
+    : `未执行：${execution.result.reason ?? execution.result.errorCode ?? execution.result.status}`;
+  return (
+    <article className={`chat-message tool ${completed ? "completed" : "failed"}`}>
+      <span>小洛宝 · 工具</span>
+      <div className="chat-tool-bubble">
+        <div className="chat-tool-heading">
+          <strong>{toolDisplayName(execution.toolCall.function.name)}</strong>
+          <span>{status}</span>
+        </div>
+        <code>{execution.toolCall.function.name}</code>
+        <details>
+          <summary>查看模型参数</summary>
+          <pre>{formatToolArguments(execution.toolCall.function.arguments)}</pre>
+        </details>
+      </div>
+    </article>
+  );
+}
+
+function updatePendingMemoryProposal(
+  setPending: Dispatch<SetStateAction<PendingConfirmation | null>>,
+  partial: Partial<Extract<ActionRequest, { type: "memory.propose" }>["payload"]>,
+): void {
+  setPending((current) => current?.action.type === "memory.propose" && current.proposal
+    ? { ...current, proposal: { ...current.proposal, ...partial } }
+    : current);
+}
+
+async function persistMemoryProposal(
+  actionId: string,
+  proposal: Extract<ActionRequest, { type: "memory.propose" }>["payload"],
+  confirmed: boolean,
+  settings: PetSettings,
+  controller: MemoryController,
+  signal: AbortSignal,
+  setStatus: (status: string) => void,
+): Promise<ActionResult> {
+  if (signal.aborted) {
+    return { actionId, status: "interrupted", reason: "Agent turn 已取消", finishedAt: Date.now() };
+  }
+  if (!memoryProposalsEnabled(settings)) {
+    return { actionId, status: "rejected", errorCode: "permission_denied", reason: "对话式记忆提议当前已关闭", finishedAt: Date.now() };
+  }
+  try {
+    const snapshot = await controller.acceptProposal(
+      proposal,
+      confirmed ? "confirmed" : "explicit_request",
+    );
+    setStatus(`已保存模型提议的记忆，当前共 ${snapshot.entries.length} 条`);
+    return { actionId, status: "completed", reason: "候选记忆已按用户策略确认并保存", finishedAt: Date.now() };
+  } catch (caught) {
+    const reason = caught instanceof Error ? caught.message : typeof caught === "string" ? caught : JSON.stringify(caught);
+    return { actionId, status: "failed", errorCode: "memory_write_failed", reason, finishedAt: Date.now() };
   }
 }

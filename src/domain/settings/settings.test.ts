@@ -81,11 +81,12 @@ describe("settings domain", () => {
       });
     });
 
-    it("长期记忆、模型注入和羁绊默认全部关闭", () => {
+    it("默认处于无记忆模式，启用后使用逐次确认提议策略", () => {
       expect(createDefaultSettings().memory).toEqual({
         enabled: false,
         includeInModelContext: false,
         bondEnabled: false,
+        proposalMode: "confirm",
       });
     });
   });
@@ -271,7 +272,7 @@ describe("settings domain", () => {
         schemaVersion: 1,
         window: { x: 100, y: 200, alwaysOnTop: false },
       });
-      expect(settings.schemaVersion).toBe(8);
+      expect(settings.schemaVersion).toBe(9);
       expect(settings.window.alwaysOnTop).toBe(false);
       expect(settings.pomodoro.focusMinutes).toBe(25);
       expect(settings.agent.provider).toBe("mock");
@@ -279,6 +280,21 @@ describe("settings domain", () => {
       expect(settings.observation.enabled).toBe(false);
       expect(settings.speech.enabled).toBe(false);
       expect(settings.memory.enabled).toBe(false);
+      expect(settings.memory.proposalMode).toBe("confirm");
+    });
+
+    it("从 schema v8 迁移时为已有长期体验补上安全的确认策略", () => {
+      const settings = migrate({
+        schemaVersion: 8,
+        memory: { enabled: true, includeInModelContext: true, bondEnabled: true },
+      });
+      expect(settings.schemaVersion).toBe(9);
+      expect(settings.memory).toEqual({
+        enabled: true,
+        includeInModelContext: true,
+        bondEnabled: true,
+        proposalMode: "confirm",
+      });
     });
 
     it("拒绝超出范围的对话超时和重试设置", () => {

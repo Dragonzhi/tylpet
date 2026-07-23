@@ -178,6 +178,8 @@ function buildPayload(
       return { outfitId: form.outfitId };
     case "speech.say":
       return { text: form.speechText, interrupt: form.speechInterrupt };
+    case "memory.propose":
+      return { category: "note", content: "调试候选", reason: "调试控制台占位" };
     case "timer.start": {
       const payload: Record<string, unknown> = {
         durationMs: parseFloat(form.timerDuration),

@@ -6,7 +6,7 @@ export interface MemoryEntry {
   id: string;
   category: MemoryCategory;
   content: string;
-  source: "user_saved";
+  source: "user_saved" | "user_confirmed_agent_proposal" | "user_explicit_agent_proposal";
   reason: string;
   createdAtMs: number;
   updatedAtMs: number;

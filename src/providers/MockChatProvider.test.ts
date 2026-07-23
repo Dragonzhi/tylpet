@@ -63,4 +63,23 @@ describe("MockChatProvider", () => {
     );
     expect(response.toolCalls).toEqual([]);
   });
+
+  it("proposes explicit memories only when the memory tool is exposed", async () => {
+    const provider = new MockChatProvider({ chunkDelayMs: 0 });
+    const response = await provider.stream(
+      {
+        requestId: "agent-memory",
+        messages: [{ role: "user", content: "请记住我不喜欢香菜" }],
+        tools: [{
+          type: "function",
+          function: { name: "memory_propose", description: "", parameters: {} },
+        }],
+      },
+      { signal: new AbortController().signal, onDelta: () => undefined },
+    );
+    expect(response.toolCalls[0]?.function).toMatchObject({
+      name: "memory_propose",
+      arguments: expect.stringContaining("我不喜欢香菜"),
+    });
+  });
 });

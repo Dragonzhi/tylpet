@@ -23,6 +23,7 @@ const VALID_ACTION_TYPES: readonly string[] = [
   "window.move",
   "outfit.equip",
   "speech.say",
+  "memory.propose",
   "timer.start",
   "timer.pause",
   "timer.resume",
@@ -237,6 +238,27 @@ function validateTimerStart(
   return null;
 }
 
+function validateMemoryPropose(payload: Record<string, unknown>): ValidationResult | null {
+  if (payload.category !== "preference" && payload.category !== "profile" && payload.category !== "note") {
+    return fail("invalid_payload", "category 必须是 preference、profile 或 note");
+  }
+  if (
+    typeof payload.content !== "string"
+    || payload.content.trim().length === 0
+    || Array.from(payload.content).length > 300
+  ) {
+    return fail("invalid_payload", "content 必须是非空字符串且不超过 300 字符");
+  }
+  if (
+    typeof payload.reason !== "string"
+    || payload.reason.trim().length === 0
+    || Array.from(payload.reason).length > 160
+  ) {
+    return fail("invalid_payload", "reason 必须是非空字符串且不超过 160 字符");
+  }
+  return null;
+}
+
 function validateTimerPause(
   payload: Record<string, unknown>,
 ): ValidationResult | null {
@@ -341,6 +363,9 @@ export function validateActionRequest(
       break;
     case "speech.say":
       payloadError = validateSpeechSay(payload);
+      break;
+    case "memory.propose":
+      payloadError = validateMemoryPropose(payload);
       break;
     case "timer.start":
       payloadError = validateTimerStart(payload);

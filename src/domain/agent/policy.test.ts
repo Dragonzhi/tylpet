@@ -11,6 +11,7 @@ function action(type: ActionRequest["type"], id: string = type): ActionRequest {
     "window.move": { target: { kind: "semantic", position: "right" }, durationMs: 1000 },
     "outfit.equip": { outfitId: "x" },
     "speech.say": { text: "x", interrupt: true },
+    "memory.propose": { category: "note", content: "x", reason: "test" },
     "timer.start": { durationMs: 60_000 },
     "timer.pause": { timerId: "t" },
     "timer.resume": { timerId: "t" },

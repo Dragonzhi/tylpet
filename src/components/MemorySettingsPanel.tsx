@@ -84,9 +84,22 @@ export default function MemorySettingsPanel({
           onChange={(event) => onChange({ bondEnabled: event.target.checked })}
         />
       </label>
+      <label style={stackedRowStyle}>
+        <span>对话式记忆提议</span>
+        <select
+          value={settings.proposalMode}
+          disabled={!settings.enabled}
+          onChange={(event) => onChange({ proposalMode: event.target.value as MemorySettings["proposalMode"] })}
+        >
+          <option value="off">关闭</option>
+          <option value="confirm">每次保存前确认</option>
+          <option value="explicit-auto">明确说“记住”时自动保存</option>
+        </select>
+      </label>
       <p style={hintStyle}>
-        总开关关闭即为无记忆模式：已有数据保留但不读取、不注入模型，也不增加羁绊。模型不能新增、编辑或删除记忆。
+        总开关关闭即为无记忆模式：已有数据保留但不读取、不注入模型，也不增加羁绊。模型不能直接新增、编辑或删除记忆，只能在启用后提出候选。
         使用外部模型且开启“向模型提供”时，这些明确保存的记忆摘要会随本轮请求发送到你配置的模型接口。
+        对话式提议只允许模型生成候选；“每次确认”模式始终询问，“明确说记住”模式也只对包含明确记忆指令的当前消息自动接受，其余自主提议仍会询问。
       </p>
 
       <div style={bondStyle}>
@@ -187,6 +200,7 @@ function MemoryEntryEditor({
 }
 
 const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 12, padding: "7px 0" };
+const stackedRowStyle: CSSProperties = { display: "grid", gap: 6, padding: "7px 0" };
 const growStyle: CSSProperties = { flex: 1 };
 const hintStyle: CSSProperties = { color: "#666", fontSize: 12, lineHeight: 1.6 };
 const bondStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr auto", gap: 6, padding: 12, background: "#eef8f6", borderRadius: 8, margin: "10px 0" };

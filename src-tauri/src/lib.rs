@@ -9,8 +9,8 @@ mod timer;
 use chat::{chat_cancel, chat_start, ChatManager};
 use media::{media_set_observation_enabled, MediaMonitor};
 use memory::{
-    memory_add_entry, memory_clear_all, memory_delete_entry, memory_export, memory_get_snapshot,
-    memory_record_interaction, memory_update_entry, MemoryManager,
+    memory_accept_proposal, memory_add_entry, memory_clear_all, memory_delete_entry, memory_export,
+    memory_get_snapshot, memory_record_interaction, memory_update_entry, MemoryManager,
 };
 use plugins::{
     plugin_inspect_manifest, plugin_install_inspected, plugin_list, plugin_set_enabled,
@@ -523,6 +523,7 @@ pub fn run() {
             media_set_observation_enabled,
             memory_get_snapshot,
             memory_add_entry,
+            memory_accept_proposal,
             memory_update_entry,
             memory_delete_entry,
             memory_clear_all,

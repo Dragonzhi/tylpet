@@ -782,6 +782,22 @@ describe("能力检查", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("memory.propose 校验分类、长度并要求记忆能力", () => {
+    const raw = {
+      protocolVersion: 1,
+      id: "memory-1",
+      type: "memory.propose",
+      source: "agent",
+      requestedAt: 1000,
+      payload: { category: "preference", content: "不喜欢香菜", reason: "长期饮食偏好" },
+    };
+    expect(validateActionRequest(raw, { capabilities: { memory: true } }).ok).toBe(true);
+    expect(validateActionRequest(raw, { capabilities: {} }))
+      .toMatchObject({ ok: false, errorCode: "unsupported_action" });
+    expect(validateActionRequest({ ...raw, payload: { ...raw.payload, category: "secret" } }).ok).toBe(false);
+    expect(validateActionRequest({ ...raw, payload: { ...raw.payload, content: "x".repeat(301) } }).ok).toBe(false);
+  });
+
   it("media.react 只接受三个播放状态并要求渲染器能力", () => {
     const raw = {
       protocolVersion: 1,

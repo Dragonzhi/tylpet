@@ -125,6 +125,33 @@ const AGENT_TOOL_ADAPTERS: readonly AgentToolAdapter[] = [
     mapArguments: (args) => ({ type: "speech.say", payload: pick(args, ["text", "interrupt"]) }),
   },
   {
+    name: "memory_propose",
+    isAvailable: ({ memory }) => memory === true,
+    createDefinition: () => defineTool(
+      "memory_propose",
+      "提议保存一条对未来对话有持续帮助的用户事实。仅提议用户明确表达的稳定偏好、个人资料或备注；不要保存秘密、认证信息、临时闲聊、模型推断或工具输出。调用后由本地策略决定是否向用户确认，绝不能声称未确认的候选已经保存。",
+      {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["preference", "profile", "note"] },
+          content: { type: "string", minLength: 1, maxLength: 300 },
+          reason: { type: "string", minLength: 1, maxLength: 160 },
+        },
+        required: ["category", "content", "reason"],
+        ...noExtraProperties,
+      },
+    ),
+    validateArguments: (args) => validateExactArguments(
+      args,
+      ["category", "content", "reason"],
+      ["category", "content", "reason"],
+    ),
+    mapArguments: (args) => ({
+      type: "memory.propose",
+      payload: pick(args, ["category", "content", "reason"]),
+    }),
+  },
+  {
     name: "timer_start",
     isAvailable: ({ timer }) => timer === true,
     createDefinition: () => defineTool("timer_start", "启动一个本地可靠计时器。", {
@@ -199,6 +226,7 @@ export function describeAgentCapabilities(snapshot: AgentCapabilitySnapshot): st
   const renderer = snapshot.capabilities.renderer;
   return [
     `本机语音朗读：${snapshot.capabilities.speech ? "可用，可调用 pet_say" : "不可用"}。`,
+    `长期记忆提议：${snapshot.capabilities.memory ? "可用，可调用 memory_propose；候选须经过本地用户策略" : "不可用"}。`,
     `动作 ID：${renderer?.motions.length ? describeValues(renderer.motions, MOTION_LABELS) : "无"}。`,
     `表情 ID：${renderer?.expressions.length ? describeValues(renderer.expressions, EXPRESSION_LABELS) : "无"}。`,
     "所有枚举参数必须逐字使用 schema 中的英文 ID；不要使用中文名、同义词或空对象。",
@@ -262,7 +290,7 @@ export function mapToolCallToAction(
 }
 
 export function actionRequiresConfirmation(type: ActionType): boolean {
-  return type === "window.move" || type === "timer.cancel";
+  return type === "window.move" || type === "timer.cancel" || type === "memory.propose";
 }
 
 export function describeActionForConfirmation(action: ActionRequest): string {
@@ -274,6 +302,10 @@ export function describeActionForConfirmation(action: ActionRequest): string {
   }
   if (action.type === "timer.cancel") {
     return `允许取消计时器“${action.payload.timerId}”吗？`;
+  }
+  if (action.type === "memory.propose") {
+    const labels = { preference: "偏好", profile: "个人资料", note: "备注" } as const;
+    return `小洛宝提议保存这条${labels[action.payload.category]}：\n“${action.payload.content}”\n原因：${action.payload.reason}`;
   }
   return "允许执行这个动作吗？";
 }
@@ -300,6 +332,7 @@ function defineTool(
 function unavailableToolReason(name: AgentToolName, capabilities: CapabilitySet): string {
   if (name === "pet_play_motion") return allowedValuesReason("motion", capabilities.renderer?.motions ?? []);
   if (name === "pet_set_expression") return allowedValuesReason("expression", capabilities.renderer?.expressions ?? []);
+  if (name === "memory_propose") return "当前未开启对话式记忆提议；不要再次调用该工具";
   return `当前运行时未启用 ${name} 对应的能力；不要再次调用该工具`;
 }
 

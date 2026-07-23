@@ -96,6 +96,13 @@ export interface SpeechSayPayload {
   interrupt?: boolean;
 }
 
+/** 模型只能提出候选；实际持久化由聊天窗口按用户策略确认后完成。 */
+export interface MemoryProposePayload {
+  category: "preference" | "profile" | "note";
+  content: string;
+  reason: string;
+}
+
 export interface TimerStartPayload {
   durationMs: number;
   label?: string;
@@ -131,6 +138,7 @@ export interface ActionPayloadMap {
   "window.move": WindowMovePayload;
   "outfit.equip": OutfitEquipPayload;
   "speech.say": SpeechSayPayload;
+  "memory.propose": MemoryProposePayload;
   "timer.start": TimerStartPayload;
   "timer.pause": TimerPausePayload;
   "timer.resume": TimerResumePayload;
