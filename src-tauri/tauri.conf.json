@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ltypet",
+  "productName": "小洛宝",
   "version": "0.1.0",
   "identifier": "com.tauri-app.ltypet",
   "build": {
@@ -49,12 +49,15 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "shortDescription": "轻量、可扩展的 Windows 桌面伙伴",
+    "longDescription": "小洛宝是一个具有透明窗口、桌面交互、番茄钟、可选模型对话和受控插件能力的 Windows 桌面伙伴。",
+    "copyright": "Copyright © 2026 ltypet contributors",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

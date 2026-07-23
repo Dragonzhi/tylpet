@@ -2,6 +2,7 @@
   "name": "ltypet",
   "private": true,
   "version": "0.1.0",
+  "description": "小洛宝——一个轻量、可扩展的 Windows 桌面伙伴预览版",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,12 +10,13 @@
     "artwork:check": "node tools/artwork/build-artwork.mjs --check",
     "build": "npm run artwork:check && tsc && vite build",
     "test": "vitest run",
+    "release:check": "node scripts/release-check.mjs",
+    "release:verify": "npm test && npm run build && npm run release:check",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
     "ajv": "^8.20.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
