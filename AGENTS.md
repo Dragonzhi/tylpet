@@ -36,6 +36,8 @@
 |---|---|
 | `src/components/TianyiPet.tsx` | 角色状态、动作入口、拖动与右键交互编排 |
 | `src/components/TianyiArtwork.tsx` | 内联 SVG、图层 rig、pivot 测量与包装 |
+| `src/assets/character/xiaoluobao/artwork.source.svg` | Inkscape 可编辑角色源文件；保留图层 label 和编辑信息 |
+| `tools/artwork/build-artwork.mjs` | 校验、规范化角色 SVG，并同步生产素材指纹 |
 | `src/config/petAnimation.ts` | 跟随、呼吸、头发惯性等动画参数 |
 | `src/config/petInteraction.ts` | 点击穿透、命中容差与窗口拖动参数 |
 | `src/hooks/usePetMotion.ts` | 鼠标跟随、耳朵和头发动态 |
@@ -79,6 +81,7 @@
 - 连续视觉动画优先使用 CSS/SVG animation；必须由 JS 驱动时使用可清理的 `requestAnimationFrame`。
 - 所有 timeout、interval、animation frame、Web Animation 和全局监听都必须在 cleanup 中释放，并考虑 React StrictMode 与 HMR 重挂载。
 - SVG 旋转围绕素材中的 pivot。测量 pivot 时排除正在生效的祖先变换，避免 StrictMode 或 HMR 后轴心漂移。
+- 不直接手改生产 `artwork.svg`。使用 Inkscape SVG 格式编辑 `artwork.source.svg`，再运行 `npm run artwork:build`；普通构建只执行 `artwork:check`，产物过期时应失败而不是静默重写。
 - 全局鼠标与窗口位置是物理像素，DOM 包围盒是 CSS 像素；换算时必须使用当前 `scaleFactor`。
 - 所有新增动画都要尊重 `prefers-reduced-motion`，并把可调幅度、周期和阈值集中到配置文件。
 
@@ -119,6 +122,8 @@
 
 ```powershell
 npm test
+npm run artwork:build
+npm run artwork:check
 npm run build
 npm run tauri dev
 npm run tauri build

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "artwork:build": "node tools/artwork/build-artwork.mjs",
+    "artwork:check": "node tools/artwork/build-artwork.mjs --check",
+    "build": "npm run artwork:check && tsc && vite build",
     "test": "vitest run",
     "preview": "vite preview",
     "tauri": "tauri"

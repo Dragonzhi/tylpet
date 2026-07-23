@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   serializeMotionLibrary,
   serializeRig,
+  sha256CanonicalText,
   validateMotionLibrary,
   validateRig,
   validateRigStructure,
@@ -14,14 +15,16 @@ function readJson(relativePath: string): unknown {
 }
 
 describe("P1 real fixtures", () => {
-  it("validates the generated xiaoluobao rig and exported wave", () => {
+  it("validates the generated xiaoluobao rig and exported wave", async () => {
     const rigResult = validateRig(readJson("../../../src/assets/character/xiaoluobao/rig.v1.json"));
     expect(rigResult.ok).toBe(true);
     if (!rigResult.ok) return;
 
-    expect(rigResult.value.artwork.fingerprint).toBe(
-      "sha256:4386f8841a89c4a814439b59bc294595e97a297e14ddd444415b640f4afffcc3",
+    const artwork = readFileSync(
+      new URL("../../../src/assets/character/xiaoluobao/artwork.svg", import.meta.url),
+      "utf8",
     );
+    expect(rigResult.value.artwork.fingerprint).toBe(await sha256CanonicalText(artwork));
     expect(rigResult.value.artwork.viewBox).toEqual([0, 0, 33.790157, 53.378078]);
     expect(rigResult.value.parts.length).toBeGreaterThan(30);
     expect(rigResult.value.parts.find((part) => part.id === "arm_right")?.pivot.x).toBeCloseTo(19.20331);
