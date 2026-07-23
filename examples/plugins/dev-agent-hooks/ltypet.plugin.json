@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "dev-agent-hooks",
+  "name": "开发 Agent 状态桥",
+  "version": "0.1.0",
+  "hostCompatibility": ">=0.1.0 <0.2.0",
+  "entry": { "type": "observation-source" },
+  "permissions": {
+    "observationEvents": ["dev-agent.status"],
+    "maxSensitivity": "status"
+  }
+}

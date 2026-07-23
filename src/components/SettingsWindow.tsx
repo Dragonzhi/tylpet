@@ -16,6 +16,7 @@ import { TauriTimerController } from "../controllers/TauriTimerController";
 import { parseSettings } from "../domain/settings/validate";
 import { createDefaultSettings } from "../domain/settings/defaults";
 import { deleteApiKey, hasApiKey, setApiKey } from "../controllers/SecureKeyStore";
+import PluginSettingsPanel from "./PluginSettingsPanel";
 
 export default function SettingsWindow() {
   const [settings, setSettings] = useState<PetSettings | null>(null);
@@ -528,6 +529,10 @@ export default function SettingsWindow() {
           <p style={hintStyle}>
             默认关闭。系统音乐只读取 playing、paused、stopped，不读取标题、歌手、歌词或音频内容。事件只在本地经过校验、频率限制和调度器；诊断不保存 payload、代码、prompt 或终端输出。相同的安静时段起止时间表示全天安静。“立即停止所有自主行为”也会暂停外部反馈，需关闭再开启总开关后恢复。
           </p>
+        </Section>
+
+        <Section title="创作者插件">
+          <PluginSettingsPanel observationEnabled={settings.observation.enabled} />
         </Section>
 
         <Section title="行为控制">

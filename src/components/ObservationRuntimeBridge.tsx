@@ -6,6 +6,11 @@ import type { ObservationSourceGrant } from "../domain/observations/types";
 import { usePetRuntime } from "../hooks/usePetRuntime";
 import { OBSERVATION_PROTOCOL_VERSION } from "../domain/observations/types";
 import { isWithinQuietHours } from "../domain/observations/policy";
+import {
+  parseInstalledPlugins,
+  pluginGrants,
+  type InstalledPlugin,
+} from "../domain/plugins/types";
 
 const WINDOWS_MEDIA_SOURCE: ObservationSourceGrant = {
   source: { kind: "system", id: "windows-media-session" },
@@ -33,6 +38,7 @@ export default function ObservationRuntimeBridge({ settings }: { settings: Obser
   const quietHoursStartMinute = settings?.quietHoursStartMinute ?? 22 * 60;
   const quietHoursEndMinute = settings?.quietHoursEndMinute ?? 8 * 60;
   const [safetyPaused, setSafetyPaused] = useState(false);
+  const [plugins, setPlugins] = useState<InstalledPlugin[]>([]);
   const [localMinute, setLocalMinute] = useState(() => currentLocalMinute());
   const reducedMotion = usePrefersReducedMotion();
   const mediaEventCounter = useRef(0);
@@ -80,9 +86,38 @@ export default function ObservationRuntimeBridge({ settings }: { settings: Obser
     && musicReactionIntensity > 0;
 
   useEffect(() => {
+    let active = true;
+    let unlistenPlugins: (() => void) | undefined;
+    let unlistenEvents: (() => void) | undefined;
+    void invoke<unknown>("plugin_list")
+      .then((value) => {
+        if (active) setPlugins(parseInstalledPlugins(value));
+      })
+      .catch((error: unknown) => console.error("读取创作者插件失败：", error));
+    void listen<unknown>("plugins-changed", (event) => {
+      if (active) setPlugins(parseInstalledPlugins(event.payload));
+    }).then((cleanup) => {
+      if (active) unlistenPlugins = cleanup;
+      else cleanup();
+    }).catch((error: unknown) => console.error("监听插件状态失败：", error));
+    void listen<unknown>("plugin-observation-event", (event) => {
+      observationHost.ingest(event.payload);
+    }).then((cleanup) => {
+      if (active) unlistenEvents = cleanup;
+      else cleanup();
+    }).catch((error: unknown) => console.error("监听插件观察事件失败：", error));
+    return () => {
+      active = false;
+      unlistenPlugins?.();
+      unlistenEvents?.();
+    };
+  }, [observationHost]);
+
+  useEffect(() => {
     const grants: ObservationSourceGrant[] = [];
     if (systemMediaEnabled) grants.push(WINDOWS_MEDIA_SOURCE);
     if (import.meta.env.DEV) grants.push(DEV_CONSOLE_SOURCE);
+    grants.push(...pluginGrants(plugins));
     observationHost.configure({
       enabled: enabled && !safetyPaused,
       diagnosticsEnabled,
@@ -100,6 +135,7 @@ export default function ObservationRuntimeBridge({ settings }: { settings: Obser
     diagnosticsEnabled,
     enabled,
     observationHost,
+    plugins,
     quietHoursEnabled,
     quietHoursEndMinute,
     quietHoursStartMinute,

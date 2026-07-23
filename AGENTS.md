@@ -45,6 +45,7 @@
 | `src/components/ChatWindow.tsx` | 独立对话窗口、流式展示、键盘发送与取消交互 |
 | `src/domain/chat/`、`src/providers/` | Provider 契约、上下文预算、离线 Mock 与原生模型适配 |
 | `src/domain/observations/` | M13 观察事件协议、校验、授权策略、反应映射和 Host |
+| `src/domain/plugins/`、`src/components/PluginSettingsPanel.tsx` | 创作者插件前端契约、动态 grant 和侧载管理 UI |
 | `src/components/ObservationRuntimeBridge.tsx` | 将设置、安全停止和逐来源 grant 应用到主窗口 ObservationHost |
 | `src/motion/` | 可独立测试的动画与交互数学 |
 | `src/App.css` | SVG/CSS 动画与图层样式 |
@@ -52,6 +53,7 @@
 | `src-tauri/src/timer.rs` | 可靠计时状态机、持久化、恢复与完成提醒 |
 | `src-tauri/src/chat.rs` | OpenAI-compatible HTTPS/SSE、有限重试、错误映射与取消 |
 | `src-tauri/src/media.rs` | Windows 系统媒体播放状态观察；只读取 playing/paused/stopped |
+| `src-tauri/src/plugins.rs` | 声明式插件注册表、回环桥接、随机凭据与 `ltypet emit` CLI |
 | `src-tauri/src/secrets.rs` | Windows DPAPI 密钥存储和旧明文文件迁移 |
 | `src-tauri/tauri.conf.json` | 窗口和 bundle 配置 |
 | `src-tauri/capabilities/default.json` | 主窗口最小权限集合 |

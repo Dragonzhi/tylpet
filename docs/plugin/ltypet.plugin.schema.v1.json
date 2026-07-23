@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ltypet.local/schemas/ltypet.plugin.v1.json",
+  "title": "ltypet creator plugin manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "version", "hostCompatibility", "entry", "permissions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "hostCompatibility": {
+      "type": "string",
+      "description": "v1 仅接受 >=x.y.z <x.y.z"
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "observation-source" } }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observationEvents", "maxSensitivity"],
+      "properties": {
+        "observationEvents": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "enum": ["dev-agent.status", "media.playback"] }
+        },
+        "maxSensitivity": { "enum": ["status", "metadata", "content"] }
+      }
+    },
+    "settingsSchema": { "type": "object" }
+  }
+}

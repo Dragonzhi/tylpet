@@ -1,11 +1,16 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod chat;
 mod media;
+mod plugins;
 mod secrets;
 mod timer;
 
 use chat::{chat_cancel, chat_start, ChatManager};
 use media::{media_set_observation_enabled, MediaMonitor};
+use plugins::{
+    plugin_inspect_manifest, plugin_install_inspected, plugin_list, plugin_set_enabled,
+    plugin_uninstall, PluginHost,
+};
 use secrets::{migrate_legacy, secret_delete, secret_has, secret_set};
 use serde::Deserialize;
 use std::fs;
@@ -510,13 +515,27 @@ pub fn run() {
             timer_resume,
             timer_cancel,
             timer_take_pending_finished,
-            media_set_observation_enabled
+            media_set_observation_enabled,
+            plugin_inspect_manifest,
+            plugin_install_inspected,
+            plugin_list,
+            plugin_set_enabled,
+            plugin_uninstall
         ])
         .setup(|app| {
             create_tray(app)?;
             app.manage(ChatManager::default());
             let app_handle = app.handle().clone();
             app.manage(MediaMonitor::start(app_handle.clone()));
+            match PluginHost::load(app_handle.clone()) {
+                Ok(plugin_host) => {
+                    app.manage(plugin_host);
+                }
+                Err(error) => {
+                    // 插件是可选能力，注册表或本机桥接失败不能阻止桌宠、托盘和退出路径。
+                    eprintln!("创作者插件宿主已降级停用：{error}");
+                }
+            }
             if let Err(error) = migrate_legacy(&app_handle) {
                 eprintln!("迁移旧密钥存储失败：{error}");
             }
@@ -530,6 +549,11 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// 在启动 WebView 前处理供进程外插件调用的受限命令行入口。
+pub fn run_cli_if_requested() -> Option<i32> {
+    plugins::run_emit_cli(std::env::args())
 }
 
 #[cfg(test)]

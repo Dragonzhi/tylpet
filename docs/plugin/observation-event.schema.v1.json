@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ltypet.local/schemas/plugin-observation-event.v1.json",
+  "title": "ltypet plugin observation event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "sensitivity", "payload"],
+  "properties": {
+    "type": { "enum": ["dev-agent.status", "media.playback"] },
+    "sensitivity": { "enum": ["status", "metadata", "content"] },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "enum": [
+            "session_started", "working", "waiting_for_user", "completed", "failed", "stopped",
+            "playing", "paused"
+          ]
+        }
+      }
+    },
+    "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 }
+  }
+}
