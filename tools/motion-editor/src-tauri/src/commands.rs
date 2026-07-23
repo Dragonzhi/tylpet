@@ -24,7 +24,7 @@ pub fn choose_project_directory(state: State<'_, HostState>) -> HostResult<Optio
 #[tauri::command]
 pub fn choose_artwork_and_assets(state: State<'_, HostState>) -> HostResult<Option<Vec<String>>> {
     let selected = rfd::FileDialog::new()
-        .add_filter("LTypet character assets", &["svg", "json"])
+        .add_filter("Tylpet character assets", &["svg", "json"])
         .pick_files();
     let Some(paths) = selected else {
         return Ok(None);
@@ -193,7 +193,7 @@ pub fn discard_recovery(project_id: String, state: State<'_, HostState>) -> Host
 #[tauri::command]
 pub fn export_diagnostics(state: State<'_, HostState>) -> HostResult<DiagnosticExport> {
     let selected = rfd::FileDialog::new()
-        .set_file_name("ltypet-animation-studio-diagnostics.json")
+        .set_file_name("tylpet-animation-studio-diagnostics.json")
         .add_filter("JSON", &["json"])
         .save_file();
     let Some(path) = selected else {
@@ -203,7 +203,7 @@ pub fn export_diagnostics(state: State<'_, HostState>) -> HostResult<DiagnosticE
     let recovery_count = recovery::read_recovery_candidates(&state.app_data)?.len();
     let payload = serde_json::json!({
         "schemaVersion": 1,
-        "application": "LTypet Animation Studio",
+        "application": "Tylpet Animation Studio",
         "applicationVersion": env!("CARGO_PKG_VERSION"),
         "generatedAtUnixMs": now_unix_ms(),
         "platform": {

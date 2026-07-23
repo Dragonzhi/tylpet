@@ -16,13 +16,15 @@ const packageLock = readJson("package-lock.json");
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
 const cargoToml = readText("src-tauri/Cargo.toml");
 const appSource = readText("src/App.tsx");
+const canonicalVersion = readText("VERSION").trim();
 
 const cargoVersion = cargoToml.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
 const versions = [packageJson.version, packageLock.version, tauriConfig.version, cargoVersion];
 
-check(versions.every((version) => version === versions[0]), `版本号不一致：${versions.join(" / ")}`);
+check(versions.every((version) => version === canonicalVersion), `版本号未与 VERSION=${canonicalVersion} 同步：${versions.join(" / ")}`);
+check(packageJson.name === "tylpet" && packageLock.name === "tylpet", "根 npm 包名必须为 tylpet");
 check(packageJson.private === true, "根 npm 包必须保持 private，避免误发布到 npm");
-check(tauriConfig.productName === "小洛宝", "安装包 productName 不是“小洛宝”");
+check(tauriConfig.productName === "绨络", "安装包 productName 不是“绨络”");
 check(tauriConfig.identifier === "com.tauri-app.ltypet", "应用标识符发生变化，会导致现有用户数据目录迁移");
 check(Array.isArray(tauriConfig.bundle?.targets) && tauriConfig.bundle.targets.includes("nsis"), "预览版必须生成 NSIS 安装包");
 check(typeof tauriConfig.app?.security?.csp === "string" && tauriConfig.app.security.csp.length > 0, "生产 CSP 不能为 null");
@@ -87,4 +89,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`发布静态检查通过：版本 ${versions[0]}，${tracked.length} 个已跟踪文件未发现运行时秘密文件。`);
+console.log(`发布静态检查通过：绨络 Tylpet ${canonicalVersion}，${tracked.length} 个已跟踪文件未发现运行时秘密文件。`);

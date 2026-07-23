@@ -1,10 +1,10 @@
-# 任务：天依桌宠 Animation Studio 视觉美化
+# 任务：Tylpet Animation Studio 视觉美化
 
 请美化 `tools/motion-editor/` 下的 SVG Animation Studio。**这是纯视觉优化，架构已经重构完毕，不要动组件结构、hook 逻辑和功能代码。**
 
 ## 背景
 
-天依桌宠是一个 Tauri v2 + React 19 + TypeScript 5.8 桌面应用。该编辑器是 Flash 风格 SVG 动画编辑器，用于制作角色动画动作。它是一个面向动画师的桌面工具。
+绨络 Tylpet 是一个 Tauri v2 + React 19 + TypeScript 5.8 桌面应用。该编辑器是 Flash 风格 SVG 动画编辑器，用于制作角色动画动作。它是一个面向动画师的桌面工具。
 
 ## 当前视觉状态
 

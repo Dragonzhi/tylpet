@@ -1,4 +1,4 @@
-# 天依桌宠 Agent 开发指南
+# 绨络 Tylpet Agent 开发指南
 
 本文档只描述编码 Agent 在本仓库工作时必须遵守的工程事实、约束和验证流程。产品愿景、当前功能和路线图统一维护在 [`HANDBOOK.md`](./HANDBOOK.md)，具体实施顺序、阶段依赖和交接进度维护在 [`计划.md`](./计划.md)，不要在多份文档中重复维护同一份功能清单。
 
@@ -58,7 +58,8 @@
 | `src-tauri/src/chat.rs` | OpenAI-compatible HTTPS/SSE、有限重试、错误映射与取消 |
 | `src-tauri/src/memory.rs` | 独立长期数据、原子备份、损坏恢复、导出和确定性羁绊 |
 | `src-tauri/src/media.rs` | Windows 系统媒体播放状态观察；只读取 playing/paused/stopped |
-| `src-tauri/src/plugins.rs` | 声明式插件注册表、回环桥接、随机凭据与 `ltypet emit` CLI |
+| `src-tauri/src/plugins.rs` | 声明式插件注册表、回环桥接、随机凭据与 `tylpet emit` CLI |
+| `VERSION`、`scripts/version.mjs` | 主程序唯一版本源及 npm/Cargo/Tauri 同步检查；Animation Studio 独立版本不在此同步 |
 | `src-tauri/src/secrets.rs` | Windows DPAPI 密钥存储和旧明文文件迁移 |
 | `src-tauri/tauri.conf.json` | 窗口和 bundle 配置 |
 | `src-tauri/capabilities/default.json` | 主窗口最小权限集合 |
@@ -99,7 +100,7 @@
 
 ### 创作者插件与外部事件
 
-- 此处“创作者插件”是 ltypet 产品扩展协议，不等同于 Tauri 官方插件；两者的权限、安装和信任边界不得混用。
+- 此处“创作者插件”是 Tylpet 产品扩展协议，不等同于 Tauri 官方插件；两者的权限、安装和信任边界不得混用。`ltypet.plugin.json` 是 v1 兼容文件名，不随产品改名破坏性调整。
 - Codex、Claude Code、IDE、媒体播放器等外部联动属于产品插件，不是核心组件中的特判逻辑。核心只消费版本化、可校验的观察事件。
 - 第三方插件默认不可信。不得在主进程或 WebView 中直接加载第三方任意 JS/Rust，也不得向插件暴露 API key、Tauri command、DOM、原始窗口控制或主程序 capability。
 - 插件事件必须经过来源授权、schema、大小、频率、去重和隐私策略，再由核心映射为语义动作并提交 `BehaviorScheduler`；插件不能直接提交可信动作或伪造成功结果。

@@ -6,16 +6,16 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Credential,
 
-  [string]$Ltypet = "",
+  [string]$Tylpet = "",
   [string]$CorrelationId = ""
 )
 
-if (-not $Ltypet) {
-  $Ltypet = Join-Path $PSScriptRoot "..\..\..\src-tauri\target\debug\ltypet.exe"
+if (-not $Tylpet) {
+  $Tylpet = Join-Path $PSScriptRoot "..\..\..\src-tauri\target\debug\tylpet.exe"
 }
 
-if (-not (Test-Path -LiteralPath $Ltypet -PathType Leaf)) {
-  Write-Error "ltypet executable not found: $Ltypet. Run npm run tauri dev first, or pass -Ltypet."
+if (-not (Test-Path -LiteralPath $Tylpet -PathType Leaf)) {
+  Write-Error "Tylpet executable not found: $Tylpet. Run npm run tauri dev first, or pass -Tylpet."
   exit 2
 }
 
@@ -37,7 +37,7 @@ try {
   exit 2
 }
 
-$Ltypet = (Resolve-Path -LiteralPath $Ltypet).Path
+$Tylpet = (Resolve-Path -LiteralPath $Tylpet).Path
 $Credential = (Resolve-Path -LiteralPath $Credential).Path
 
 $arguments = @(
@@ -51,5 +51,5 @@ if ($CorrelationId) {
   $arguments += @("--correlation-id", $CorrelationId)
 }
 
-& $Ltypet @arguments
+& $Tylpet @arguments
 exit $LASTEXITCODE

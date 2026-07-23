@@ -143,7 +143,7 @@ async fn show_context_menu(
         .id(MENU_OPEN_CHAT)
         .build(&app)
         .map_err(|e| e.to_string())?;
-    let exit_item = MenuItemBuilder::new("退出小洛宝")
+    let exit_item = MenuItemBuilder::new("退出绨络")
         .id(MENU_EXIT)
         .accelerator("Ctrl+Shift+Q")
         .build(&app)
@@ -331,7 +331,7 @@ async fn open_settings(app: tauri::AppHandle) -> Result<(), String> {
         window.set_focus().map_err(|e| e.to_string())?;
     } else {
         tauri::WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
-            .title("小洛宝设置")
+            .title("绨络设置")
             .inner_size(480.0, 520.0)
             .resizable(true)
             .build()
@@ -375,7 +375,7 @@ fn handle_window_menu_event(app: &tauri::AppHandle, event: MenuEvent) {
                     "settings",
                     WebviewUrl::App("settings.html".into()),
                 )
-                .title("小洛宝设置")
+                .title("绨络设置")
                 .inner_size(480.0, 520.0)
                 .resizable(true)
                 .build();
@@ -447,9 +447,7 @@ fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     let chat_item = MenuItemBuilder::new("与小洛宝对话")
         .id(MENU_OPEN_CHAT)
         .build(app)?;
-    let exit_item = MenuItemBuilder::new("退出小洛宝")
-        .id(MENU_EXIT)
-        .build(app)?;
+    let exit_item = MenuItemBuilder::new("退出绨络").id(MENU_EXIT).build(app)?;
     let menu = MenuBuilder::new(app)
         .item(&show_item)
         .separator()
@@ -461,7 +459,7 @@ fn create_tray(app: &tauri::App) -> tauri::Result<()> {
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
-        .tooltip("小洛宝")
+        .tooltip("绨络 Tylpet · 小洛宝")
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
             if matches!(

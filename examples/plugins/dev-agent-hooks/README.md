@@ -1,6 +1,6 @@
 # dev-agent-hooks 示例插件
 
-这个示例把 Codex、Claude Code 或其他开发 Agent 可用的生命周期 hook 转成小洛宝可理解的状态。它只传以下枚举值：
+这个示例把 Codex、Claude Code 或其他开发 Agent 可用的生命周期 hook 转成 Tylpet 当前角色小洛宝可理解的状态。它只传以下枚举值：
 
 - `session_started`
 - `working`

@@ -42,7 +42,7 @@ fn protect(plaintext: &[u8]) -> Result<Vec<u8>, String> {
     unsafe {
         CryptProtectData(
             &input,
-            w!("ltypet API keys"),
+            w!("Tylpet API keys"),
             None,
             None,
             None,

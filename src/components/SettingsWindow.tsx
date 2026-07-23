@@ -234,7 +234,7 @@ export default function SettingsWindow() {
   return (
     <div style={containerStyle}>
       <header style={headerStyle}>
-        <h1 style={{ margin: 0, fontSize: 18 }}>小洛宝设置</h1>
+        <h1 style={{ margin: 0, fontSize: 18 }}>绨络设置</h1>
         {loadError && <div style={warnStyle}>设置文件损坏，已使用默认值</div>}
       </header>
 

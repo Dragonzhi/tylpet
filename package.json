@@ -1,8 +1,8 @@
 {
-  "name": "ltypet",
+  "name": "tylpet",
   "private": true,
-  "version": "0.1.0",
-  "description": "小洛宝——一个轻量、可扩展的 Windows 桌面伙伴预览版",
+  "version": "0.1.0-preview.1",
+  "description": "绨络 Tylpet——一个轻量、可扩展的 Windows 桌面伙伴",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +10,12 @@
     "artwork:check": "node tools/artwork/build-artwork.mjs --check",
     "build": "npm run artwork:check && tsc && vite build",
     "test": "vitest run",
+    "version:sync": "node scripts/version.mjs",
+    "version:check": "node scripts/version.mjs --check",
+    "version:show": "node scripts/version.mjs --show",
     "release:check": "node scripts/release-check.mjs",
-    "release:verify": "npm test && npm run build && npm run release:check",
+    "release:verify": "npm run version:check && npm test && npm run build && npm run release:check",
+    "release:tag": "node scripts/release-tag.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

@@ -353,7 +353,7 @@ pub fn memory_export(app: AppHandle, manager: State<'_, MemoryManager>) -> Resul
         .download_dir()
         .map_err(|error| error.to_string())?;
     fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
-    let path = dir.join(format!("ltypet-memory-{}.json", now_ms()));
+    let path = dir.join(format!("tylpet-memory-{}.json", now_ms()));
     let json = serde_json::to_string_pretty(&snapshot).map_err(|error| error.to_string())?;
     fs::write(&path, json).map_err(|error| error.to_string())?;
     Ok(path.to_string_lossy().into_owned())
@@ -684,7 +684,7 @@ mod tests {
 
     #[test]
     fn corrupted_primary_recovers_from_valid_backup() {
-        let dir = std::env::temp_dir().join(format!("ltypet-memory-test-{}", now_ms()));
+        let dir = std::env::temp_dir().join(format!("tylpet-memory-test-{}", now_ms()));
         let path = dir.join("memory.v1.json");
         let mut expected = MemorySnapshot::default();
         expected.bond.points = 7;
@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn corrupted_primary_and_backup_are_reset_to_valid_empty_data() {
-        let dir = std::env::temp_dir().join(format!("ltypet-memory-reset-test-{}", now_ms()));
+        let dir = std::env::temp_dir().join(format!("tylpet-memory-reset-test-{}", now_ms()));
         let path = dir.join("memory.v1.json");
         fs::create_dir_all(&dir).unwrap();
         fs::write(&path, "{broken").unwrap();

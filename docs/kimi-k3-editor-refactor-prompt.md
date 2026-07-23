@@ -1,10 +1,10 @@
-# 任务：深度重构天依桌宠 Animation Studio
+# 任务：深度重构 Tylpet Animation Studio
 
 请重构 `tools/motion-editor/` 下的 SVG Animation Studio。
 
 ## 背景
 
-天依桌宠是一个 Tauri v2 + React 19 + TypeScript 5.8 桌面桌宠应用。该编辑器是其独立的 Flash 风格 SVG 动画编辑器（基于 SVG-edit），用于制作角色动画动作。共享数学库在 `packages/character-motion/`，编辑器与生产桌宠通过它解耦。
+绨络 Tylpet 是一个 Tauri v2 + React 19 + TypeScript 5.8 桌面桌宠应用。该编辑器是其独立的 Flash 风格 SVG 动画编辑器（基于 SVG-edit），用于制作角色动画动作。共享数学库在 `packages/character-motion/`，编辑器与生产桌宠通过它解耦。
 
 ## 技术约束
 

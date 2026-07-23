@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "小洛宝",
-  "version": "0.1.0",
+  "productName": "绨络",
+  "version": "0.1.0-preview.1",
   "identifier": "com.tauri-app.ltypet",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -26,7 +26,7 @@
       {
         "label": "settings",
         "url": "settings.html",
-        "title": "小洛宝设置",
+        "title": "绨络设置",
         "width": 480,
         "height": 520,
         "decorations": true,
@@ -54,10 +54,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "shortDescription": "轻量、可扩展的 Windows 桌面伙伴",
-    "longDescription": "小洛宝是一个具有透明窗口、桌面交互、番茄钟、可选模型对话和受控插件能力的 Windows 桌面伙伴。",
-    "copyright": "Copyright © 2026 ltypet contributors",
+    "targets": [
+      "nsis"
+    ],
+    "shortDescription": "绨络 Tylpet——轻量、可扩展的 Windows 桌面伙伴",
+    "longDescription": "绨络 Tylpet 是一个具有透明窗口、桌面交互、番茄钟、可选模型对话和受控插件能力的 Windows 桌面伙伴；小洛宝是当前内置角色。",
+    "copyright": "Copyright © 2026 Tylpet contributors",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

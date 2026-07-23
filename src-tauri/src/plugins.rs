@@ -539,8 +539,18 @@ fn parse_version(value: &str) -> Result<(u32, u32, u32), String> {
     Ok((parse(parts[0])?, parse(parts[1])?, parse(parts[2])?))
 }
 
+/// 插件 v1 的 hostCompatibility 描述宿主 API 的稳定 x.y.z 兼容线。
+/// 构建版本可以带 SemVer prerelease/build 后缀，但它们不改变该 API 兼容线。
+fn parse_host_version(value: &str) -> Result<(u32, u32, u32), String> {
+    let core = value
+        .split(|character| character == '-' || character == '+')
+        .next()
+        .unwrap_or(value);
+    parse_version(core)
+}
+
 fn host_version_matches(requirement: &str) -> Result<bool, String> {
-    let host = parse_version(HOST_VERSION)?;
+    let host = parse_host_version(HOST_VERSION)?;
     let mut lower = None;
     let mut upper = None;
     for token in requirement
@@ -775,7 +785,7 @@ pub fn run_emit_cli(arguments: impl IntoIterator<Item = String>) -> Option<i32> 
             Some(0)
         }
         Err(error) => {
-            eprintln!("ltypet emit 失败：{error}");
+            eprintln!("tylpet emit 失败：{error}");
             Some(2)
         }
     }
@@ -787,7 +797,7 @@ fn emit_from_cli(arguments: Vec<String>) -> Result<String, String> {
     while index < arguments.len() {
         let key = arguments[index].clone();
         if !key.starts_with("--") || index + 1 >= arguments.len() {
-            return Err("用法：ltypet emit --credential <path> --type <event> --state <state> [--correlation-id <id>]".to_string());
+            return Err("用法：tylpet emit --credential <path> --type <event> --state <state> [--correlation-id <id>]".to_string());
         }
         if values.insert(key, arguments[index + 1].clone()).is_some() {
             return Err("CLI 参数不能重复".to_string());
@@ -885,10 +895,10 @@ fn validate_cli_state(event_type: &str, state: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        authorize_bridge_request, constant_time_eq, host_version_matches, validate_cli_state,
-        validate_event_payload, validate_manifest, BridgeEvent, BridgeRequest, PluginEntry,
-        PluginManifest, PluginPermissions, PluginRegistry, RegistryFile, RegistryPlugin,
-        BRIDGE_PROTOCOL_VERSION, MAX_EVENTS_PER_MINUTE,
+        authorize_bridge_request, constant_time_eq, host_version_matches, parse_host_version,
+        validate_cli_state, validate_event_payload, validate_manifest, BridgeEvent, BridgeRequest,
+        PluginEntry, PluginManifest, PluginPermissions, PluginRegistry, RegistryFile,
+        RegistryPlugin, BRIDGE_PROTOCOL_VERSION, MAX_EVENTS_PER_MINUTE,
     };
     use serde_json::json;
     use std::collections::{BTreeMap, HashMap};
@@ -919,6 +929,8 @@ mod tests {
         assert!(validate_manifest(&manifest()).is_ok());
         assert!(host_version_matches(">=0.1.0 <0.2.0").unwrap());
         assert!(!host_version_matches(">=1.0.0 <2.0.0").unwrap());
+        assert_eq!(parse_host_version("0.1.0-preview.1").unwrap(), (0, 1, 0));
+        assert_eq!(parse_host_version("0.1.0+build.7").unwrap(), (0, 1, 0));
     }
 
     #[test]

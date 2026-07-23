@@ -29,7 +29,7 @@ npm --prefix tools/motion-editor run release:check
 npm --prefix tools/motion-editor run build:portable
 ```
 
-输出位于 `tools/motion-editor/src-tauri/target/release/ltypet-motion-editor.exe`。它不携带项目，不写安装目录；WebView2 仍是系统前置条件。
+当前内部二进制仍输出到 `tools/motion-editor/src-tauri/target/release/ltypet-motion-editor.exe`，用户可见产品名为 `Tylpet Animation Studio`。它不携带项目，不写安装目录；WebView2 仍是系统前置条件。
 
 NSIS 安装包：
 
