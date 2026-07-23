@@ -143,6 +143,10 @@ async fn show_context_menu(
         .id(MENU_OPEN_CHAT)
         .build(&app)
         .map_err(|e| e.to_string())?;
+    let settings_item = MenuItemBuilder::new("设置")
+        .id(MENU_OPEN_SETTINGS)
+        .build(&app)
+        .map_err(|e| e.to_string())?;
     let exit_item = MenuItemBuilder::new("退出绨络")
         .id(MENU_EXIT)
         .accelerator("Ctrl+Shift+Q")
@@ -154,6 +158,7 @@ async fn show_context_menu(
         .item(&center_item)
         .separator()
         .item(&chat_item)
+        .item(&settings_item)
         .separator()
         .item(&exit_item)
         .build()
