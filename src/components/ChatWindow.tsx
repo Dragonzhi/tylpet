@@ -31,6 +31,7 @@ import { buildMemoryContext } from "../domain/memory/types";
 import type { MemoryCategory } from "../domain/memory/types";
 import { memoryProposalRequiresConfirmation } from "../domain/memory/proposalPolicy";
 import { insertBeforeItem, summarizeToolOnlyTurn, toolDisplayName } from "../domain/chat/toolTimeline";
+import { getBehaviorModePolicy } from "../domain/behavior/modePolicy";
 import "../styles/ChatWindow.css";
 
 export default function ChatWindow() {
@@ -117,7 +118,11 @@ export default function ChatWindow() {
   }, []);
 
   useEffect(() => {
-    if (settings && !settings.agent.enabled && runningRequestId) abortRef.current?.abort();
+    if (
+      settings
+      && (!settings.agent.enabled || !getBehaviorModePolicy(settings.behavior.mode).allowAgent)
+      && runningRequestId
+    ) abortRef.current?.abort();
   }, [settings, runningRequestId]);
 
   useEffect(() => {
@@ -129,10 +134,16 @@ export default function ChatWindow() {
   }
 
   const provider = createProvider(settings);
+  const modePolicy = getBehaviorModePolicy(settings.behavior.mode);
+  const agentEnabled = settings.agent.enabled && modePolicy.allowAgent;
+  const speechEnabled = settings.speech.enabled
+    && settings.audio.enabled
+    && settings.audio.volume > 0
+    && modePolicy.allowSpeech;
   const isExternal = provider.external;
   const insecureHttp = isExternal && requiresInsecureHttpOptIn(settings.agent.endpoint);
   const canSend = input.trim().length > 0 && runningRequestId === null;
-  const enabledToolCount = agentCapabilities
+  const enabledToolCount = agentEnabled && agentCapabilities
     ? createAgentToolDefinitions(withMemoryCapability(agentCapabilities, memoryProposalsEnabled(settings))).length
     : 0;
 
@@ -153,7 +164,7 @@ export default function ChatWindow() {
       return;
     }
     let turnCapabilities = agentCapabilities;
-    if (settings.agent.enabled && !turnCapabilities) {
+    if (agentEnabled && !turnCapabilities) {
       try {
         turnCapabilities = await actionClientRef.current.getCapabilities(new AbortController().signal);
         setAgentCapabilities(turnCapabilities);
@@ -216,7 +227,7 @@ export default function ChatWindow() {
             : message
         ));
       };
-      if (settings.agent.enabled) {
+      if (agentEnabled) {
         const turnSnapshot = withMemoryCapability(turnCapabilities!, memoryProposalsEnabled(settings));
         await runAgentTurn({
           provider,
@@ -268,7 +279,7 @@ export default function ChatWindow() {
       if (
         spokenReply
         && !spokeViaTool
-        && settings.speech.enabled
+        && speechEnabled
         && settings.speech.autoReadReplies
         && settings.audio.enabled
         && settings.audio.volume > 0
@@ -353,8 +364,10 @@ export default function ChatWindow() {
         <div>
           <h1>与小洛宝对话</h1>
           <p>{provider.id === "mock" ? "离线 Mock · 不会联网" : `外部模型 · ${settings.agent.model || "未配置模型"}`}</p>
-          <span className={settings.agent.enabled ? "agent-state enabled" : "agent-state"}>
-            {settings.agent.enabled
+          <span className={agentEnabled ? "agent-state enabled" : "agent-state"}>
+            {settings.agent.enabled && !modePolicy.allowAgent
+              ? `${modePolicy.label}模式已暂停 Agent`
+              : agentEnabled
               ? agentCapabilities
                 ? `Agent 工具已启用 · ${enabledToolCount} 项`
                 : capabilitySyncError
@@ -364,7 +377,7 @@ export default function ChatWindow() {
           </span>
         </div>
         <div className="chat-header-actions">
-          {settings.speech.enabled && (
+          {speechEnabled && (
             <button
               type="button"
               className="chat-secondary"
@@ -376,6 +389,10 @@ export default function ChatWindow() {
           <button type="button" className="chat-secondary" onClick={() => void invoke("open_settings")}>设置</button>
         </div>
       </header>
+
+      <div className="chat-disclosure" role="status">
+        当前为{modePolicy.label}模式。{modePolicy.summary}
+      </div>
 
       <div className={isExternal ? "chat-disclosure external" : "chat-disclosure"} role="note">
         {insecureHttp && settings.agent.allowInsecureHttp
@@ -390,9 +407,11 @@ export default function ChatWindow() {
         {messages.length === 0 && (
           <div className="chat-empty">
             <strong>先随便说点什么吧。</strong>
-            <span>{settings.agent.enabled
+            <span>{agentEnabled
               ? "可以让我招手、移动、计时，或在长期体验开启时提议记住一件事；高影响动作和自主记忆提议会先征求确认。"
-              : "当前是纯文本对话；在设置中开启 Agent 后才会暴露受控语义工具。"}</span>
+              : settings.agent.enabled && !modePolicy.allowAgent
+                ? `当前${modePolicy.label}模式暂停 Agent；仍可进行纯文本对话。`
+                : "当前是纯文本对话；在设置中开启 Agent 后才会暴露受控语义工具。"}</span>
           </div>
         )}
         {messages.map((message) => (

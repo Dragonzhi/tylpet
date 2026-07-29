@@ -47,6 +47,14 @@ describe("settings domain", () => {
       expect(settings.agent.allowInsecureHttp).toBe(false);
     });
 
+    it("首次启动默认使用陪伴模式并显示能力说明", () => {
+      const settings = createDefaultSettings();
+      expect(settings.behavior).toEqual({
+        mode: "companion",
+        onboardingCompleted: false,
+      });
+    });
+
     it("本地语音和自动朗读默认关闭", () => {
       const settings = createDefaultSettings();
       expect(settings.speech).toEqual({
@@ -272,7 +280,7 @@ describe("settings domain", () => {
         schemaVersion: 1,
         window: { x: 100, y: 200, alwaysOnTop: false },
       });
-      expect(settings.schemaVersion).toBe(9);
+      expect(settings.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(settings.window.alwaysOnTop).toBe(false);
       expect(settings.pomodoro.focusMinutes).toBe(25);
       expect(settings.agent.provider).toBe("mock");
@@ -281,6 +289,10 @@ describe("settings domain", () => {
       expect(settings.speech.enabled).toBe(false);
       expect(settings.memory.enabled).toBe(false);
       expect(settings.memory.proposalMode).toBe("confirm");
+      expect(settings.behavior).toEqual({
+        mode: "companion",
+        onboardingCompleted: false,
+      });
     });
 
     it("从 schema v8 迁移时为已有长期体验补上安全的确认策略", () => {
@@ -288,12 +300,22 @@ describe("settings domain", () => {
         schemaVersion: 8,
         memory: { enabled: true, includeInModelContext: true, bondEnabled: true },
       });
-      expect(settings.schemaVersion).toBe(9);
+      expect(settings.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
       expect(settings.memory).toEqual({
         enabled: true,
         includeInModelContext: true,
         bondEnabled: true,
         proposalMode: "confirm",
+      });
+    });
+
+    it("迁移时只保留已知角色模式", () => {
+      expect(migrate({
+        schemaVersion: 9,
+        behavior: { mode: "model-controlled", onboardingCompleted: true },
+      }).behavior).toEqual({
+        mode: "companion",
+        onboardingCompleted: true,
       });
     });
 

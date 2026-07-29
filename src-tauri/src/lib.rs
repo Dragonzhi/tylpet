@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod chat;
+mod diagnostics;
 mod media;
 mod memory;
 mod plugins;
@@ -7,6 +8,7 @@ mod secrets;
 mod timer;
 
 use chat::{chat_cancel, chat_start, ChatManager};
+use diagnostics::export_sanitized_diagnostics;
 use media::{media_set_observation_enabled, MediaMonitor};
 use memory::{
     memory_accept_proposal, memory_add_entry, memory_clear_all, memory_delete_entry, memory_export,
@@ -508,6 +510,7 @@ pub fn run() {
             get_work_area,
             load_settings,
             save_settings,
+            export_sanitized_diagnostics,
             secret_has,
             secret_set,
             secret_delete,

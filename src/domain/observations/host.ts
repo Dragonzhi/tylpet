@@ -43,6 +43,7 @@ export class ObservationHost {
       enabled: config.enabled,
       diagnosticsEnabled: config.diagnosticsEnabled,
       grants: [...config.grants],
+      cooldownMultiplier: normalizeCooldownMultiplier(config.cooldownMultiplier),
       ...(config.quietHours === undefined ? {} : { quietHours: { ...config.quietHours } }),
     };
     if (!config.diagnosticsEnabled) this.diagnostics = [];
@@ -110,7 +111,7 @@ export class ObservationHost {
     this.options.scheduler.submit(action, {
       channel,
       priority: "agent",
-      cooldownMs: reaction.cooldownMs,
+      cooldownMs: reaction.cooldownMs * normalizeCooldownMultiplier(this.config.cooldownMultiplier),
     });
     const result: ObservationIngestResult = { status: "scheduled", eventId: event.id, action };
     this.record(event, result);
@@ -184,6 +185,10 @@ export class ObservationHost {
     const excess = this.diagnostics.length - this.options.limits.diagnosticCapacity;
     if (excess > 0) this.diagnostics.splice(0, excess);
   }
+}
+
+function normalizeCooldownMultiplier(value: number | undefined): number {
+  return value !== undefined && Number.isFinite(value) && value >= 1 ? value : 1;
 }
 
 function defaultId(): string {

@@ -67,6 +67,8 @@ export interface ObservationRuntimeConfig {
   enabled: boolean;
   diagnosticsEnabled: boolean;
   grants: readonly ObservationSourceGrant[];
+  /** 角色模式对一次性环境反应冷却的倍率；持续媒体状态不受影响。 */
+  cooldownMultiplier?: number;
   quietHours?: {
     enabled: boolean;
     startMinute: number;
