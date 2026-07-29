@@ -26,7 +26,7 @@ export class BehaviorScheduler {
   private waitTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; action: ActionRequest }>();
   private listeners = new Set<(event: SchedulerEvent) => void>();
   private cooldowns = new Map<ActionType, number>();
-  private agentPaused = false;
+  private agentPauseReasons = new Set<string>();
   private disposed = false;
 
   constructor(options?: SchedulerOptions) {
@@ -272,12 +272,13 @@ export class BehaviorScheduler {
     }
   }
 
-  pauseAgentActions(): void {
-    this.agentPaused = true;
+  pauseAgentActions(reason = "legacy"): void {
+    this.agentPauseReasons.add(reason);
   }
 
-  resumeAgentActions(): void {
-    this.agentPaused = false;
+  resumeAgentActions(reason = "legacy"): void {
+    this.agentPauseReasons.delete(reason);
+    if (this.agentPauseReasons.size > 0) return;
     // Try to schedule pending agent actions on all channels
     const channels = new Set<Channel>();
     for (const p of this.pendingQueue) {
@@ -288,6 +289,18 @@ export class BehaviorScheduler {
     for (const ch of channels) {
       this.tryScheduleNext(ch);
     }
+  }
+
+  cancelAgentActions(): void {
+    const actionIds = [
+      ...this.pendingQueue
+        .filter((action) => action.priority === "agent")
+        .map((action) => action.actionId),
+      ...[...this.activeActions.values()]
+        .filter((action) => action.priority === "agent")
+        .map((action) => action.actionId),
+    ];
+    for (const actionId of actionIds) this.cancel(actionId);
   }
 
   onEvent(listener: (event: SchedulerEvent) => void): () => void {
@@ -376,7 +389,7 @@ export class BehaviorScheduler {
     } else {
       // Mutex group is free
       // Check agent pause
-      if (this.agentPaused && priority === "agent") {
+      if (this.agentPauseReasons.size > 0 && priority === "agent") {
         this.addToPending(action, channel, priority, cooldownMs);
         return;
       }
@@ -590,7 +603,7 @@ export class BehaviorScheduler {
     const next = this.pendingQueue[bestIdx];
 
     // Check agent pause
-    if (this.agentPaused && next.priority === "agent") {
+    if (this.agentPauseReasons.size > 0 && next.priority === "agent") {
       return;
     }
 

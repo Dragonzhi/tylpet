@@ -125,4 +125,31 @@ describe("生产动作资产加载", () => {
       ]),
     });
   });
+
+  it("缺少非必需动作时按能力列表降级而不伪造动作", async () => {
+    const reducedMotions = clone(motionsJson);
+    reducedMotions.clips = reducedMotions.clips.filter((clip) => clip.id !== "bow");
+    const bundle = await loadCharacterMotionBundle({
+      artworkText,
+      artworkSource: "artwork.svg",
+      rigJson,
+      motionsJson: reducedMotions,
+    });
+    expect([...bundle.clips.keys()]).toEqual(["stretch", "wave"]);
+  });
+
+  it("拒绝 Animation Studio 不兼容的 motions schema 版本", async () => {
+    const incompatibleMotions = clone(motionsJson);
+    incompatibleMotions.schemaVersion = 2;
+    await expect(loadCharacterMotionBundle({
+      artworkText,
+      artworkSource: "artwork.svg",
+      rigJson,
+      motionsJson: incompatibleMotions,
+    })).rejects.toMatchObject({
+      diagnostics: expect.arrayContaining([
+        expect.objectContaining({ code: "invalid-motions" }),
+      ]),
+    });
+  });
 });

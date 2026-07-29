@@ -2,8 +2,10 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import type {
   PetSettings,
+  BehaviorSettings,
   WindowSettings,
   AnimationSettings,
   AudioSettings,
@@ -20,10 +22,19 @@ import { createDefaultSettings } from "../domain/settings/defaults";
 import { deleteApiKey, hasApiKey, setApiKey } from "../controllers/SecureKeyStore";
 import PluginSettingsPanel from "./PluginSettingsPanel";
 import MemorySettingsPanel from "./MemorySettingsPanel";
+import {
+  BEHAVIOR_MODE_POLICIES,
+  getBehaviorModePolicy,
+  getEffectiveBehaviorCapabilities,
+} from "../domain/behavior/modePolicy";
+import type {
+  RuntimeDiagnosticsResponse,
+  RuntimeDiagnosticsSnapshot,
+} from "../domain/diagnostics/types";
 import "../styles/SettingsWindow.css";
 
 export default function SettingsWindow() {
-  const [activePage, setActivePage] = useState<SettingsPageId>("window");
+  const [activePage, setActivePage] = useState<SettingsPageId>("behavior");
   const [settings, setSettings] = useState<PetSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [timer, setTimer] = useState<TimerSnapshot | null>(null);
@@ -34,6 +45,8 @@ export default function SettingsWindow() {
   const [apiKeyPresent, setApiKeyPresent] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<string | null>(null);
   const [speechVoices, setSpeechVoices] = useState<SpeechVoice[]>([]);
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -53,6 +66,10 @@ export default function SettingsWindow() {
         setSettings(createDefaultSettings());
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    void getVersion().then(setAppVersion).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -151,6 +168,9 @@ export default function SettingsWindow() {
   const updateWindow = (partial: Partial<WindowSettings>) =>
     save({ ...settings, window: { ...settings.window, ...partial } });
 
+  const updateBehavior = (partial: Partial<BehaviorSettings>) =>
+    save({ ...settings, behavior: { ...settings.behavior, ...partial } });
+
   const updateAnimation = (partial: Partial<AnimationSettings>) =>
     save({ ...settings, animation: { ...settings.animation, ...partial } });
 
@@ -233,6 +253,20 @@ export default function SettingsWindow() {
     }
   };
 
+  const modePolicy = getBehaviorModePolicy(settings.behavior.mode);
+  const effectiveCapabilities = getEffectiveBehaviorCapabilities(settings);
+
+  const exportDiagnostics = async () => {
+    setDiagnosticsStatus("正在收集脱敏诊断…");
+    try {
+      const runtime = await requestRuntimeDiagnostics();
+      const path = await invoke<string>("export_sanitized_diagnostics", { runtime });
+      setDiagnosticsStatus(`诊断已导出到：${path}`);
+    } catch (error) {
+      setDiagnosticsStatus(`诊断导出失败：${String(error)}`);
+    }
+  };
+
   return (
     <div style={containerStyle}>
       <header style={headerStyle}>
@@ -241,6 +275,26 @@ export default function SettingsWindow() {
       </header>
 
       <main style={mainStyle}>
+        {!settings.behavior.onboardingCompleted && (
+          <section style={onboardingStyle} role="dialog" aria-labelledby="welcome-title">
+            <div>
+              <h2 id="welcome-title" style={onboardingTitleStyle}>欢迎使用绨络预览版</h2>
+              <p style={onboardingTextStyle}>
+                小洛宝的基础桌宠和离线 Mock 不联网。外部 Provider 只有在你选择并同意后才发送有限对话；Agent 只能调用受控语义工具；TTS 使用本机系统语音；系统观察和创作者插件默认关闭。
+              </p>
+              <p style={onboardingTextStyle}>
+                设置、计时、记忆和插件注册信息保存在当前 Windows 用户的 %APPDATA%\com.tauri-app.ltypet 目录；API key 使用 Windows DPAPI 独立加密。应用不保存完整聊天，也不包含遥测或后台上传。
+              </p>
+            </div>
+            <button
+              type="button"
+              style={primaryBtnStyle}
+              onClick={() => updateBehavior({ onboardingCompleted: true })}
+            >
+              我知道了，开始使用
+            </button>
+          </section>
+        )}
         <nav style={pageNavStyle} aria-label="设置分页">
           <div style={pageTabsStyle} role="tablist" aria-label="设置分类">
             {settingsPages.map((page) => (
@@ -292,6 +346,55 @@ export default function SettingsWindow() {
             <p style={pageHeadingDescriptionStyle}>{settingsPages[currentPageIndex(activePage)].description}</p>
           </div>
         </div>
+        {activePage === "behavior" && <>
+        <Section title="角色模式">
+          <div style={modeGridStyle} role="radiogroup" aria-label="角色行为模式">
+            {BEHAVIOR_MODE_POLICIES.map((policy) => (
+              <label
+                key={policy.mode}
+                style={settings.behavior.mode === policy.mode ? activeModeCardStyle : modeCardStyle}
+              >
+                <input
+                  type="radio"
+                  name="behavior-mode"
+                  value={policy.mode}
+                  checked={settings.behavior.mode === policy.mode}
+                  onChange={() => updateBehavior({ mode: policy.mode })}
+                />
+                <span>
+                  <strong>{policy.label}</strong>
+                  <small style={modeSummaryStyle}>{policy.summary}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="当前生效边界">
+          <div style={capabilityGridStyle}>
+            <CapabilityStatus label="Agent 工具" enabled={effectiveCapabilities.agent} />
+            <CapabilityStatus label="本机语音" enabled={effectiveCapabilities.speech} />
+            <CapabilityStatus label="外部反馈" enabled={effectiveCapabilities.observations} />
+            <CapabilityStatus label="番茄钟" enabled={effectiveCapabilities.timer} />
+          </div>
+          <p style={hintStyle}>
+            {modePolicy.summary} 模式只会收紧能力，不会替你开启已关闭的总开关；模型和插件不能切换模式。用户拖动、菜单、托盘、退出和“立即停止”始终保留。
+          </p>
+        </Section>
+
+        <Section title="反馈与诊断">
+          <p style={hintStyle}>
+            导出内容只包含版本、平台、模式、能力开关和有限的动作/观察结果；不包含 API key、接口地址、模型名称、完整聊天、prompt、工具参数、终端输出、文件内容或观察 payload。文件不会自动上传。
+          </p>
+          <div style={timerActionsStyle}>
+            <button type="button" style={btnStyle} onClick={() => void exportDiagnostics()}>
+              导出脱敏诊断
+            </button>
+          </div>
+          {diagnosticsStatus && <div style={timerStatusStyle} role="status">{diagnosticsStatus}</div>}
+        </Section>
+        </>}
+
         {activePage === "window" && <>
         <Section title="窗口">
           <Row label="始终置顶">
@@ -743,6 +846,7 @@ export default function SettingsWindow() {
       </main>
 
       <footer style={footerStyle}>
+        {appVersion && <span style={versionStyle}>绨络 Tylpet v{appVersion}</span>}
         <button
           style={btnStyle}
           onClick={() => getCurrentWindow().close()}
@@ -772,7 +876,19 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+function CapabilityStatus({ label, enabled }: { label: string; enabled: boolean }) {
+  return (
+    <div style={capabilityStatusStyle}>
+      <span>{label}</span>
+      <strong style={enabled ? capabilityEnabledStyle : capabilityPausedStyle}>
+        {enabled ? "可用" : "已关闭或暂停"}
+      </strong>
+    </div>
+  );
+}
+
 type SettingsPageId =
+  | "behavior"
   | "window"
   | "animation"
   | "audio"
@@ -785,6 +901,7 @@ type SettingsPageId =
   | "memory";
 
 const settingsPages: Array<{ id: SettingsPageId; label: string; description: string }> = [
+  { id: "behavior", label: "模式", description: "陪伴与打扰边界" },
   { id: "window", label: "窗口", description: "位置与层级" },
   { id: "animation", label: "动画", description: "动作强度" },
   { id: "audio", label: "声音", description: "音量与提示" },
@@ -824,6 +941,32 @@ function parseTimeValue(value: string): number {
   const [hours, minutes] = value.split(":").map(Number);
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return 0;
   return Math.min(1_439, Math.max(0, hours * 60 + minutes));
+}
+
+async function requestRuntimeDiagnostics(): Promise<RuntimeDiagnosticsSnapshot | null> {
+  const requestId = typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `diagnostics-${Date.now()}`;
+  return new Promise((resolve) => {
+    let settled = false;
+    let unlisten: (() => void) | undefined;
+    const finish = (snapshot: RuntimeDiagnosticsSnapshot | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      unlisten?.();
+      resolve(snapshot);
+    };
+    const timeout = window.setTimeout(() => finish(null), 1_200);
+    void listen<RuntimeDiagnosticsResponse>("runtime-diagnostics-response", (event) => {
+      if (event.payload.requestId === requestId) finish(event.payload.snapshot);
+    }).then((cleanup) => {
+      unlisten = cleanup;
+      if (settled) cleanup();
+      else void emitTo("main", "runtime-diagnostics-request", { requestId })
+        .catch(() => finish(null));
+    }).catch(() => finish(null));
+  });
 }
 
 const containerStyle: CSSProperties = {
@@ -990,7 +1133,13 @@ const footerStyle: CSSProperties = {
   borderTop: "1px solid #e5e5e5",
   background: "#fff",
   display: "flex",
-  justifyContent: "flex-end",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
+const versionStyle: CSSProperties = {
+  color: "#94a3b8",
+  fontSize: 11,
 };
 
 const btnStyle: CSSProperties = {
@@ -1029,3 +1178,90 @@ const warnStyle: CSSProperties = {
   fontSize: 12,
   color: "#92400e",
 };
+
+const onboardingStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 18,
+  margin: "18px 0 0",
+  padding: "16px 18px",
+  border: "1px solid #5eead4",
+  borderRadius: 14,
+  background: "linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%)",
+  boxShadow: "0 8px 24px rgba(13, 148, 136, 0.1)",
+};
+
+const onboardingTitleStyle: CSSProperties = {
+  margin: "0 0 6px",
+  fontSize: 16,
+  color: "#115e59",
+};
+
+const onboardingTextStyle: CSSProperties = {
+  margin: "3px 0",
+  color: "#335f5d",
+  fontSize: 12,
+  lineHeight: 1.6,
+};
+
+const primaryBtnStyle: CSSProperties = {
+  ...btnStyle,
+  flexShrink: 0,
+  borderColor: "#0d9488",
+  background: "#0d9488",
+  color: "white",
+};
+
+const modeGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+};
+
+const modeCardStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 9,
+  minHeight: 78,
+  padding: "11px 12px",
+  border: "1px solid #e2e8f0",
+  borderRadius: 10,
+  background: "#fff",
+  cursor: "pointer",
+};
+
+const activeModeCardStyle: CSSProperties = {
+  ...modeCardStyle,
+  borderColor: "#14b8a6",
+  background: "#f0fdfa",
+  boxShadow: "0 0 0 1px rgba(20, 184, 166, 0.16)",
+};
+
+const modeSummaryStyle: CSSProperties = {
+  display: "block",
+  marginTop: 4,
+  color: "#64748b",
+  fontSize: 11,
+  lineHeight: 1.45,
+};
+
+const capabilityGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+  marginBottom: 10,
+};
+
+const capabilityStatusStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  gap: 8,
+  padding: "8px 10px",
+  borderRadius: 8,
+  background: "#f8fafc",
+  fontSize: 12,
+};
+
+const capabilityEnabledStyle: CSSProperties = { color: "#0f766e" };
+const capabilityPausedStyle: CSSProperties = { color: "#94a3b8" };

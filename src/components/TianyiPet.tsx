@@ -25,6 +25,8 @@ import AgentRuntimeBridge from "./AgentRuntimeBridge";
 import ObservationRuntimeBridge from "./ObservationRuntimeBridge";
 import { PET_ANIMATION_CONFIG } from "../config/petAnimation";
 import SpeechRuntimeBridge from "./SpeechRuntimeBridge";
+import { getBehaviorModePolicy } from "../domain/behavior/modePolicy";
+import RuntimeDiagnosticsBridge from "./RuntimeDiagnosticsBridge";
 
 // 天依的核心动画状态
 type PetState = "idle" | "blink" | "listen" | "speak" | "sleep" | "drag";
@@ -94,10 +96,13 @@ const TianyiPetInnerContent = ({
 
   const { scheduler, renderer, speechController } = usePetRuntime();
   const { settings, updateWindowPosition } = useSettings();
+  const modePolicy = getBehaviorModePolicy(settings?.behavior.mode ?? "companion");
+  const effectiveAnimationIntensity = (settings?.animation.intensity ?? 1)
+    * modePolicy.animationIntensityMultiplier;
   const musicConfig = PET_ANIMATION_CONFIG.musicReaction;
   const mouthConfig = PET_ANIMATION_CONFIG.speechMouth;
-  const musicIntensity = settings?.observation.musicReactionIntensity
-    ?? musicConfig.defaultIntensity;
+  const musicIntensity = (settings?.observation.musicReactionIntensity
+    ?? musicConfig.defaultIntensity) * modePolicy.observationIntensityMultiplier;
   const petStyle: PetShellStyle = {
     cursor: state === "drag" ? "grabbing" : "grab",
     "--music-cycle-ms": `${musicConfig.cycleMs}ms`,
@@ -116,17 +121,35 @@ const TianyiPetInnerContent = ({
     "--mouth-closed-fade-multiplier": mouthConfig.closedFadeMultiplier,
     "--mouth-reduced-motion-level": mouthConfig.reducedMotionLevel,
     "--mouth-transition-ms": `${mouthConfig.smoothingMs}ms`,
+    "--breath-scale-y": 1 + 0.01 * effectiveAnimationIntensity,
+    "--breath-cycle-ms": `${Math.round(3600 / Math.max(0.2, effectiveAnimationIntensity))}ms`,
+    "--limb-cycle-ms": `${Math.round(3600 / Math.max(0.2, effectiveAnimationIntensity))}ms`,
+    "--tie-cycle-ms": `${Math.round(2900 / Math.max(0.2, effectiveAnimationIntensity))}ms`,
   };
 
   // Keep hooks as-is
   usePointerFollow(
     petElement,
     "global",
-    !suppressedChannels.has("pointer-follow"),
+    !modePolicy.sleeping && !suppressedChannels.has("pointer-follow"),
   );
-  useEarTwitch(petElement, !suppressedChannels.has("ear-twitch"));
+  useEarTwitch(petElement, !modePolicy.sleeping && !suppressedChannels.has("ear-twitch"));
   const { beginDrag: beginHairDrag, endDrag: endHairDrag } =
-    useHairMotion(petElement, !suppressedChannels.has("hair-physics"));
+    useHairMotion(petElement, !modePolicy.sleeping && !suppressedChannels.has("hair-physics"));
+
+  useEffect(() => {
+    if (modePolicy.allowAgent) {
+      scheduler.resumeAgentActions("behavior-mode");
+      return;
+    }
+    scheduler.pauseAgentActions("behavior-mode");
+    scheduler.cancelAgentActions();
+    scheduler.cancelChannel("ambient");
+    scheduler.cancelChannel("speech");
+    renderer.setMediaReaction("stopped");
+    speechController.stop();
+    return () => scheduler.resumeAgentActions("behavior-mode");
+  }, [modePolicy.allowAgent, renderer, scheduler, speechController]);
 
   // --- Drag end handler: resume agent actions and persist window position ---
   const handleWindowDragEnd = useCallback(
@@ -134,7 +157,7 @@ const TianyiPetInnerContent = ({
       hasDragged.current = didDrag;
       endHairDrag();
       setState("idle");
-      scheduler.resumeAgentActions();
+      scheduler.resumeAgentActions("drag");
 
       // Persist window position after drag
       if (didDrag) {
@@ -166,10 +189,10 @@ const TianyiPetInnerContent = ({
       restoreStateTimer.current = window.setTimeout(() => {
         setExpression("normal");
       }, 180);
-    }, 3000 + Math.random() * 2000);
+    }, (3000 + Math.random() * 2000) * modePolicy.blinkIntervalMultiplier);
 
     return () => window.clearTimeout(blinkTimer);
-  }, [state, setExpression, suppressedChannels]);
+  }, [modePolicy.blinkIntervalMultiplier, state, setExpression, suppressedChannels]);
 
   useEffect(
     () => () => {
@@ -192,7 +215,7 @@ const TianyiPetInnerContent = ({
 
     scheduler.cancelChannel("locomotion");
     scheduler.cancelChannel("body-motion");
-    scheduler.pauseAgentActions();
+    scheduler.pauseAgentActions("drag");
 
     setState("drag");
     hasDragged.current = false;
@@ -219,7 +242,7 @@ const TianyiPetInnerContent = ({
       hasDragged.current = fallbackDidDrag;
       endHairDrag();
       setState("idle");
-      scheduler.resumeAgentActions();
+      scheduler.resumeAgentActions("drag");
     }
   };
 
@@ -228,7 +251,7 @@ const TianyiPetInnerContent = ({
       if (contextMenuOpenRef.current) return;
       contextMenuOpenRef.current = true;
       setContextMenuOpen(true);
-      scheduler.pauseAgentActions();
+      scheduler.pauseAgentActions("context-menu");
 
       try {
         await invoke("show_context_menu", { position });
@@ -237,7 +260,7 @@ const TianyiPetInnerContent = ({
       } finally {
         contextMenuOpenRef.current = false;
         setContextMenuOpen(false);
-        scheduler.resumeAgentActions();
+        scheduler.resumeAgentActions("context-menu");
       }
     },
     [scheduler],
@@ -305,21 +328,28 @@ const TianyiPetInnerContent = ({
     <SpeechRuntimeBridge
       speech={settings?.speech ?? null}
       audio={settings?.audio ?? null}
+      enabledByMode={modePolicy.allowSpeech}
     />
     <AgentRuntimeBridge
-      enabled={settings?.agent.enabled ?? false}
+      enabled={Boolean(settings?.agent.enabled && modePolicy.allowAgent)}
       speechEnabled={Boolean(
-        settings?.speech.enabled
+        modePolicy.allowSpeech
+        && settings?.speech.enabled
         && settings.audio.enabled
         && settings.audio.volume > 0
         && speechController.isAvailable(),
       )}
     />
-    <ObservationRuntimeBridge settings={settings?.observation ?? null} />
+    <ObservationRuntimeBridge
+      settings={settings?.observation ?? null}
+      modePolicy={modePolicy}
+    />
+    <RuntimeDiagnosticsBridge behaviorMode={modePolicy.mode} />
     <div
       ref={petElement}
       aria-label="小洛宝，按回车招手，按菜单键打开菜单"
-      className={`pet-shell${state === "sleep" ? " is-sleeping" : ""}`}
+      className={`pet-shell${modePolicy.sleeping && state !== "drag" ? " is-sleeping" : ""}`}
+      data-behavior-mode={modePolicy.mode}
       data-mouth-cross-fade={mouthConfig.crossFadeEnabled ? "true" : "false"}
       data-suppress-breathing={suppressedChannels.has("breathing") || undefined}
       data-suppress-blinking={suppressedChannels.has("blinking") || undefined}
@@ -335,7 +365,9 @@ const TianyiPetInnerContent = ({
       tabIndex={0}
     >
       <TianyiArtwork
-        expression={expression}
+        expression={modePolicy.sleeping && state !== "drag" && expression === "normal"
+          ? "sleep"
+          : expression}
         onMotionTargetReady={handleMotionTargetReady}
       />
     </div>

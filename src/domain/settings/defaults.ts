@@ -10,6 +10,10 @@ import { CURRENT_SCHEMA_VERSION } from "./types";
 export function createDefaultSettings(): PetSettings {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    behavior: {
+      mode: "companion",
+      onboardingCompleted: false,
+    },
     window: {
       x: Number.NaN,
       y: Number.NaN,
