@@ -1,0 +1,21 @@
+.settings-page-tab {
+  appearance: none;
+  -webkit-appearance: none;
+  border-style: solid;
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.settings-page-tab:focus,
+.settings-page-tab:active {
+  outline: none !important;
+}
+
+.settings-page-tab:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.28) !important;
+}
+
+.settings-page-tab::-moz-focus-inner {
+  border: 0;
+}

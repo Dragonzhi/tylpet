@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { SettingsStore } from "../controllers/SettingsStore";
 import type { PetSettings } from "../domain/settings/types";
@@ -72,6 +73,10 @@ export function useSettings() {
 
       setSettings(loaded);
       setRestored(true);
+
+      if (!loaded.behavior.onboardingCompleted) {
+        void invoke("open_settings").catch(() => undefined);
+      }
     };
 
     void init();
@@ -114,6 +119,7 @@ export function useSettings() {
         const next: PetSettings = {
           ...base,
           ...partial,
+          behavior: { ...base.behavior, ...partial.behavior },
           window: { ...base.window, ...partial.window },
           animation: { ...base.animation, ...partial.animation },
           audio: { ...base.audio, ...partial.audio },

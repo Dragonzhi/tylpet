@@ -8,7 +8,18 @@
  */
 
 /** 当前设置结构版本号 */
-export const CURRENT_SCHEMA_VERSION = 9 as const;
+export const CURRENT_SCHEMA_VERSION = 10 as const;
+
+/** 用户可直接选择的角色行为模式；模型和插件不能修改此字段。 */
+export type BehaviorMode = "companion" | "focus" | "quiet" | "sleep";
+
+/** 角色模式与首次使用说明状态。 */
+export interface BehaviorSettings {
+  /** 当前角色行为模式。 */
+  mode: BehaviorMode;
+  /** 是否已经阅读当前预览版的本地能力与隐私说明。 */
+  onboardingCompleted: boolean;
+}
 
 /** 窗口位置与外观状态 */
 export interface WindowSettings {
@@ -119,6 +130,7 @@ export interface MemorySettings {
 /** 完整的用户设置 */
 export interface PetSettings {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION;
+  behavior: BehaviorSettings;
   window: WindowSettings;
   animation: AnimationSettings;
   audio: AudioSettings;

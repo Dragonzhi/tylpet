@@ -12,13 +12,15 @@ interface SpeechReadRequest {
 export default function SpeechRuntimeBridge({
   speech,
   audio,
+  enabledByMode,
 }: {
   speech: SpeechSettings | null;
   audio: AudioSettings | null;
+  enabledByMode: boolean;
 }) {
   const { speechController, scheduler } = usePetRuntime();
   const reducedMotion = usePrefersReducedMotion();
-  const enabled = Boolean(speech?.enabled && audio?.enabled && audio.volume > 0);
+  const enabled = Boolean(enabledByMode && speech?.enabled && audio?.enabled && audio.volume > 0);
 
   useEffect(() => {
     speechController.configure({

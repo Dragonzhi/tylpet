@@ -587,6 +587,36 @@ describe("Agent 暂停", () => {
     expect(executor.calls[0].action.id).toBe("a1");
   });
 
+  it("多个暂停来源全部释放后才恢复 agent 动作", () => {
+    scheduler.pauseAgentActions("behavior-mode");
+    scheduler.pauseAgentActions("context-menu");
+    scheduler.submit(
+      makeAction({ id: "a1", type: "motion.play", source: "agent" }),
+      { channel: "body-motion" },
+    );
+
+    scheduler.resumeAgentActions("context-menu");
+    expect(executor.calls).toHaveLength(0);
+    scheduler.resumeAgentActions("behavior-mode");
+    expect(executor.calls).toHaveLength(1);
+  });
+
+  it("模式收束可以取消运行中和排队中的自主动作", () => {
+    scheduler.submit(
+      makeAction({ id: "a1", type: "motion.play", source: "agent" }),
+      { channel: "body-motion" },
+    );
+    scheduler.submit(
+      makeAction({ id: "a2", type: "motion.play", source: "agent" }),
+      { channel: "body-motion" },
+    );
+
+    scheduler.cancelAgentActions();
+    expect(scheduler.getActiveActions()).toHaveLength(0);
+    expect(scheduler.getPendingActions()).toHaveLength(0);
+    expect(events.filter((event) => event.type === "cancelled")).toHaveLength(2);
+  });
+
   it("暂停也约束显式使用 agent 优先级的系统观察动作", () => {
     scheduler.pauseAgentActions();
     const observationAction = makeAction({ id: "media", type: "media.react", source: "system" });

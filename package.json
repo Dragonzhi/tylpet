@@ -1,7 +1,7 @@
 {
   "name": "tylpet",
   "private": true,
-  "version": "0.1.0-preview.1",
+  "version": "0.1.0-preview.2",
   "description": "绨络 Tylpet——一个轻量、可扩展的 Windows 桌面伙伴",
   "type": "module",
   "scripts": {

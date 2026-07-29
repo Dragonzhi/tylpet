@@ -92,6 +92,9 @@ body,
   --look-transition-ms: 110ms;
   /* 以脚底为固定点的呼吸幅度；1.003 约等于头顶起伏 1px。 */
   --breath-scale-y: 1.01;
+  --breath-cycle-ms: 3600ms;
+  --limb-cycle-ms: 3600ms;
+  --tie-cycle-ms: 2900ms;
   --music-bob-target: 0px;
   --music-tilt-target: 0deg;
   --music-tail-target: 0deg;
@@ -188,7 +191,7 @@ body,
 .pet-breathe {
   transform-box: fill-box;
   transform-origin: center bottom;
-  animation: pet-breathe 3.6s ease-in-out infinite;
+  animation: pet-breathe var(--breath-cycle-ms) ease-in-out infinite;
 }
 
 .tianyi-artwork #body {
@@ -371,17 +374,17 @@ body,
 }
 
 .pet-shell:not(.is-sleeping) #arm-left {
-  animation: pet-arm-left 3.6s ease-in-out infinite;
+  animation: pet-arm-left var(--limb-cycle-ms) ease-in-out infinite;
 }
 
 .pet-shell:not(.is-sleeping) #arm-right-motion {
-  animation: pet-arm-right 3.6s ease-in-out infinite;
+  animation: pet-arm-right var(--limb-cycle-ms) ease-in-out infinite;
 }
 
 .pet-shell:not(.is-sleeping) #tie {
   transform-box: fill-box;
   transform-origin: 50% 5%;
-  animation: pet-tie-sway 2.9s ease-in-out infinite;
+  animation: pet-tie-sway var(--tie-cycle-ms) ease-in-out infinite;
 }
 
 .expression-speak #mouth-closed {

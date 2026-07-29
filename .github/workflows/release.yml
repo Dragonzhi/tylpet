@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.0
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-directories: src-tauri/target
+
+      - name: Rust check
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust fmt check
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Version sync check
+        run: npm run version:check
+
+      - name: Release check
+        run: npm run release:check
+
+      - name: Git diff check
+        run: git diff --check
+
+      - name: Build Tauri NSIS installer
+        run: npm run tauri build -- --bundles nsis
+
+      - name: Generate SHA256SUMS
+        run: |
+          $outputPath = "sha256sums.txt"
+          Remove-Item -Path $outputPath -ErrorAction SilentlyContinue
+          Get-ChildItem -Path src-tauri\target\release\bundle\nsis -Filter *.exe | ForEach-Object {
+            $hash = Get-FileHash -Algorithm SHA256 -Path $_.FullName
+            Add-Content -Path $outputPath -Value "$($hash.Hash)  $($_.Name)"
+          }
+        shell: pwsh
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            ## 绨络 Tylpet ${{ github.ref_name }}
+
+            请查看 [CHANGELOG.md](https://github.com/Tylpet/ltypet/blob/main/CHANGELOG.md) 了解完整变更。
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            sha256sums.txt
+          prerelease: ${{ contains(github.ref_name, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

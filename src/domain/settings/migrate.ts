@@ -37,6 +37,10 @@ export function migrate(raw: unknown): PetSettings {
 function mergeWithDefaults(obj: Record<string, unknown>): PetSettings {
   const defaults = createDefaultSettings();
 
+  const behavior = typeof obj.behavior === "object" && obj.behavior !== null
+    ? obj.behavior as Record<string, unknown>
+    : {};
+
   const window = typeof obj.window === "object" && obj.window !== null
     ? obj.window as Record<string, unknown>
     : {};
@@ -71,6 +75,17 @@ function mergeWithDefaults(obj: Record<string, unknown>): PetSettings {
 
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    behavior: {
+      mode: behavior.mode === "companion"
+        || behavior.mode === "focus"
+        || behavior.mode === "quiet"
+        || behavior.mode === "sleep"
+        ? behavior.mode
+        : defaults.behavior.mode,
+      onboardingCompleted: typeof behavior.onboardingCompleted === "boolean"
+        ? behavior.onboardingCompleted
+        : defaults.behavior.onboardingCompleted,
+    },
     window: {
       x: typeof window.x === "number" ? window.x : defaults.window.x,
       y: typeof window.y === "number" ? window.y : defaults.window.y,

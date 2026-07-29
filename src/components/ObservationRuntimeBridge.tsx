@@ -11,6 +11,7 @@ import {
   pluginGrants,
   type InstalledPlugin,
 } from "../domain/plugins/types";
+import type { BehaviorModePolicy } from "../domain/behavior/modePolicy";
 
 const WINDOWS_MEDIA_SOURCE: ObservationSourceGrant = {
   source: { kind: "system", id: "windows-media-session" },
@@ -28,11 +29,18 @@ const DEV_CONSOLE_SOURCE: ObservationSourceGrant = {
  * 将持久化设置应用到主窗口唯一的 ObservationHost。
  * 第三方插件授权不会在这里使用通配符，M13-C 将由插件注册表逐项加入 grant。
  */
-export default function ObservationRuntimeBridge({ settings }: { settings: ObservationSettings | null }) {
+export default function ObservationRuntimeBridge({
+  settings,
+  modePolicy,
+}: {
+  settings: ObservationSettings | null;
+  modePolicy: BehaviorModePolicy;
+}) {
   const { observationHost, renderer } = usePetRuntime();
   const enabled = settings?.enabled ?? false;
   const systemMediaEnabled = settings?.systemMediaEnabled ?? false;
-  const musicReactionIntensity = settings?.musicReactionIntensity ?? 0.55;
+  const musicReactionIntensity = (settings?.musicReactionIntensity ?? 0.55)
+    * modePolicy.observationIntensityMultiplier;
   const diagnosticsEnabled = settings?.diagnosticsEnabled ?? true;
   const quietHoursEnabled = settings?.quietHoursEnabled ?? false;
   const quietHoursStartMinute = settings?.quietHoursStartMinute ?? 22 * 60;
@@ -78,7 +86,9 @@ export default function ObservationRuntimeBridge({ settings }: { settings: Obser
     quietHoursStartMinute,
     quietHoursEndMinute,
   );
+  const modeAllowsObservations = modePolicy.allowObservations;
   const mediaObserverEnabled = enabled
+    && modeAllowsObservations
     && systemMediaEnabled
     && !safetyPaused
     && !quietNow
@@ -119,9 +129,10 @@ export default function ObservationRuntimeBridge({ settings }: { settings: Obser
     if (import.meta.env.DEV) grants.push(DEV_CONSOLE_SOURCE);
     grants.push(...pluginGrants(plugins));
     observationHost.configure({
-      enabled: enabled && !safetyPaused,
+      enabled: enabled && modeAllowsObservations && !safetyPaused,
       diagnosticsEnabled,
       grants,
+      cooldownMultiplier: modePolicy.observationCooldownMultiplier,
       quietHours: {
         enabled: quietHoursEnabled,
         startMinute: quietHoursStartMinute,
@@ -134,6 +145,8 @@ export default function ObservationRuntimeBridge({ settings }: { settings: Obser
   }, [
     diagnosticsEnabled,
     enabled,
+    modeAllowsObservations,
+    modePolicy.observationCooldownMultiplier,
     observationHost,
     plugins,
     quietHoursEnabled,

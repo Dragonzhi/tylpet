@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tools/motion-editor/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run tests (root)
+        run: npm test
+
+      - name: Build (root)
+        run: npm run build
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.0
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-directories: |
+            src-tauri/target
+            tools/motion-editor/src-tauri/target
+
+      - name: Rust check (root)
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust test (root)
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust fmt check (root)
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Version sync check
+        run: npm run version:check
+
+      - name: Git diff check
+        run: git diff --check
+
+      - name: Install motion-editor dependencies
+        working-directory: tools/motion-editor
+        run: npm ci
+
+      - name: Run tests (motion-editor)
+        working-directory: tools/motion-editor
+        run: npm test
+
+      - name: Build (motion-editor)
+        working-directory: tools/motion-editor
+        run: npm run build
+
+      - name: Rust check (motion-editor)
+        run: cargo check --manifest-path tools/motion-editor/src-tauri/Cargo.toml
+
+      - name: Rust test (motion-editor)
+        run: cargo test --manifest-path tools/motion-editor/src-tauri/Cargo.toml
+
+      - name: Rust fmt check (motion-editor)
+        run: cargo fmt --manifest-path tools/motion-editor/src-tauri/Cargo.toml -- --check
