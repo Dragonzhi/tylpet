@@ -27,9 +27,8 @@ import { PET_ANIMATION_CONFIG } from "../config/petAnimation";
 import SpeechRuntimeBridge from "./SpeechRuntimeBridge";
 import { getBehaviorModePolicy } from "../domain/behavior/modePolicy";
 import RuntimeDiagnosticsBridge from "./RuntimeDiagnosticsBridge";
-
-// 天依的核心动画状态
-type PetState = "idle" | "blink" | "listen" | "speak" | "sleep" | "drag";
+import CompanionRuntimeBridge from "./CompanionRuntimeBridge";
+import type { CompanionPetState } from "../domain/companion/types";
 
 interface ContextMenuPosition {
   x: number;
@@ -88,11 +87,13 @@ const TianyiPetInnerContent = ({
   suppressedChannels,
   petElement,
 }: TianyiPetInnerContentProps) => {
-  const [state, setState] = useState<PetState>("idle");
+  const [state, setState] = useState<CompanionPetState>("idle");
+  const [lastUserInteractionAtMs, setLastUserInteractionAtMs] = useState(() => Date.now());
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const contextMenuOpenRef = useRef(false);
   const hasDragged = useRef(false);
   const restoreStateTimer = useRef<number | undefined>(undefined);
+  const engagementStateRef = useRef<"idle" | "listen" | "speak">("idle");
 
   const { scheduler, renderer, speechController } = usePetRuntime();
   const { settings, updateWindowPosition } = useSettings();
@@ -111,7 +112,9 @@ const TianyiPetInnerContent = ({
     "--music-config-tilt-target": `${musicConfig.bodyTiltDeg * musicIntensity}deg`,
     "--music-config-tail-target": `${musicConfig.tailRotateDeg * musicIntensity}deg`,
     "--music-config-ear-target": `${musicConfig.earRotateDeg * musicIntensity}deg`,
-    "--music-config-particle-opacity": musicIntensity * 0.55,
+    "--music-config-particle-opacity": settings?.companion.particlesEnabled === false
+      ? 0
+      : musicIntensity * 0.55,
     "--mouth-normal-maximum": mouthConfig.normalMaximum,
     "--mouth-scale-x-minimum": mouthConfig.scaleXMinimum,
     "--mouth-scale-x-range": 1 - mouthConfig.scaleXMinimum,
@@ -137,6 +140,15 @@ const TianyiPetInnerContent = ({
   const { beginDrag: beginHairDrag, endDrag: endHairDrag } =
     useHairMotion(petElement, !modePolicy.sleeping && !suppressedChannels.has("hair-physics"));
 
+  const markUserInteraction = useCallback(() => {
+    setLastUserInteractionAtMs(Date.now());
+  }, []);
+
+  const handleEngagementStateChange = useCallback((next: "idle" | "listen" | "speak") => {
+    engagementStateRef.current = next;
+    setState((current) => current === "drag" ? current : next);
+  }, []);
+
   useEffect(() => {
     if (modePolicy.allowAgent) {
       scheduler.resumeAgentActions("behavior-mode");
@@ -156,7 +168,8 @@ const TianyiPetInnerContent = ({
     (didDrag: boolean) => {
       hasDragged.current = didDrag;
       endHairDrag();
-      setState("idle");
+      setState(engagementStateRef.current);
+      markUserInteraction();
       scheduler.resumeAgentActions("drag");
 
       // Persist window position after drag
@@ -171,7 +184,7 @@ const TianyiPetInnerContent = ({
         })();
       }
     },
-    [endHairDrag, scheduler, updateWindowPosition],
+    [endHairDrag, markUserInteraction, scheduler, updateWindowPosition],
   );
   const windowDrag = useWindowDrag({ onEnd: handleWindowDragEnd });
   useClickThrough(petElement, {
@@ -213,6 +226,8 @@ const TianyiPetInnerContent = ({
   const handleMouseDown = async (event: React.MouseEvent) => {
     if (event.button !== 0) return;
 
+    markUserInteraction();
+
     scheduler.cancelChannel("locomotion");
     scheduler.cancelChannel("body-motion");
     scheduler.pauseAgentActions("drag");
@@ -241,7 +256,7 @@ const TianyiPetInnerContent = ({
     } finally {
       hasDragged.current = fallbackDidDrag;
       endHairDrag();
-      setState("idle");
+      setState(engagementStateRef.current);
       scheduler.resumeAgentActions("drag");
     }
   };
@@ -249,6 +264,7 @@ const TianyiPetInnerContent = ({
   const showContextMenu = useCallback(
     async (position: ContextMenuPosition) => {
       if (contextMenuOpenRef.current) return;
+      markUserInteraction();
       contextMenuOpenRef.current = true;
       setContextMenuOpen(true);
       scheduler.pauseAgentActions("context-menu");
@@ -263,7 +279,7 @@ const TianyiPetInnerContent = ({
         scheduler.resumeAgentActions("context-menu");
       }
     },
-    [scheduler],
+    [markUserInteraction, scheduler],
   );
 
   const handleContextMenu = (event: React.MouseEvent) => {
@@ -274,6 +290,7 @@ const TianyiPetInnerContent = ({
 
   const triggerWave = useCallback(() => {
     if (hasDragged.current) return;
+    markUserInteraction();
     const channel = getDefaultChannel("motion.play");
     if (!channel) return;
     const actionRequest: ActionRequest = {
@@ -284,7 +301,7 @@ const TianyiPetInnerContent = ({
       requestedAt: Date.now(),
     } as ActionRequest;
     scheduler.submit(actionRequest, { channel, priority: "user" });
-  }, [scheduler]);
+  }, [markUserInteraction, scheduler]);
 
   const handleClick = useCallback(() => {
     if (hasDragged.current) {
@@ -323,6 +340,10 @@ const TianyiPetInnerContent = ({
     [renderer],
   );
 
+  const visualState: CompanionPetState = modePolicy.sleeping && state !== "drag"
+    ? "sleep"
+    : state;
+
   return (
     <>
     <SpeechRuntimeBridge
@@ -344,12 +365,21 @@ const TianyiPetInnerContent = ({
       settings={settings?.observation ?? null}
       modePolicy={modePolicy}
     />
+    <CompanionRuntimeBridge
+      settings={settings?.companion ?? null}
+      mode={modePolicy.mode}
+      petState={visualState}
+      lastUserInteractionAtMs={lastUserInteractionAtMs}
+      onEngagementStateChange={handleEngagementStateChange}
+      onUserActivity={markUserInteraction}
+    />
     <RuntimeDiagnosticsBridge behaviorMode={modePolicy.mode} />
     <div
       ref={petElement}
       aria-label="小洛宝，按回车招手，按菜单键打开菜单"
       className={`pet-shell${modePolicy.sleeping && state !== "drag" ? " is-sleeping" : ""}`}
       data-behavior-mode={modePolicy.mode}
+      data-pet-state={visualState}
       data-mouth-cross-fade={mouthConfig.crossFadeEnabled ? "true" : "false"}
       data-suppress-breathing={suppressedChannels.has("breathing") || undefined}
       data-suppress-blinking={suppressedChannels.has("blinking") || undefined}

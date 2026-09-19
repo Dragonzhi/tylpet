@@ -122,6 +122,18 @@ describe("合法输入通过校验", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("本地自主陪伴来源可通过协议校验", () => {
+    const result = validateActionRequest({
+      protocolVersion: 1,
+      id: "companion-stretch-1",
+      type: "motion.play",
+      source: "ambient",
+      requestedAt: 1000,
+      payload: { motion: "stretch" },
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("合法的 timer.cancel 通过校验", () => {
     const result = validateActionRequest({
       protocolVersion: 1,

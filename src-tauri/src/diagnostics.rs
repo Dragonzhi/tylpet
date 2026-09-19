@@ -107,6 +107,9 @@ fn settings_summary(settings: Option<&Value>) -> Value {
         "readable": settings.is_some(),
         "schemaVersion": get("/schemaVersion").and_then(Value::as_u64),
         "behaviorMode": get("/behavior/mode").and_then(Value::as_str),
+        "companionAutonomyEnabled": get("/companion/autonomyEnabled").and_then(Value::as_bool),
+        "companionIdleFrequency": get("/companion/idleFrequency").and_then(Value::as_str),
+        "companionParticlesEnabled": get("/companion/particlesEnabled").and_then(Value::as_bool),
         "providerKind": get("/agent/provider").and_then(Value::as_str),
         "agentEnabled": get("/agent/enabled").and_then(Value::as_bool),
         "speechEnabled": get("/speech/enabled").and_then(Value::as_bool),
@@ -218,8 +221,13 @@ mod tests {
     #[test]
     fn report_whitelists_settings_and_excludes_sensitive_values() {
         let settings = json!({
-            "schemaVersion": 10,
+            "schemaVersion": 11,
             "behavior": { "mode": "focus" },
+            "companion": {
+                "autonomyEnabled": true,
+                "idleFrequency": "low",
+                "particlesEnabled": true
+            },
             "agent": {
                 "enabled": true,
                 "provider": "openai-compatible",
@@ -235,6 +243,7 @@ mod tests {
         let report = build_report(Some(&settings), None, 123, "0.1.0-preview.2");
         let text = serde_json::to_string(&report).unwrap();
         assert!(text.contains("openai-compatible"));
+        assert!(text.contains("companionAutonomyEnabled"));
         for secret in [
             "top-secret",
             "secret.example",

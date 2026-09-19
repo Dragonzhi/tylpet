@@ -3,7 +3,7 @@ export const PROTOCOL_VERSION = 1 as const;
 export type ProtocolVersion = typeof PROTOCOL_VERSION;
 
 // --- Action source ---
-export type ActionSource = "user" | "agent" | "timer" | "system" | "dev";
+export type ActionSource = "user" | "agent" | "timer" | "system" | "ambient" | "dev";
 
 // --- Action envelope (the typed request after validation) ---
 export interface ActionEnvelope<TType extends string, TPayload> {

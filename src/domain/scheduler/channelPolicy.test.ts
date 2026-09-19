@@ -45,6 +45,10 @@ describe("默认优先级", () => {
     expect(getDefaultPriority("system")).toBe("safety-stop");
   });
 
+  it("ambient 来源默认优先级为 idle", () => {
+    expect(getDefaultPriority("ambient")).toBe("idle");
+  });
+
   it("dev 来源默认优先级为 idle", () => {
     expect(getDefaultPriority("dev")).toBe("idle");
   });

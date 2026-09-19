@@ -37,7 +37,7 @@ const ACTION_TYPES: ActionType[] = [
   "wait",
 ];
 
-const SOURCES: ActionSource[] = ["user", "agent", "timer", "system", "dev"];
+const SOURCES: ActionSource[] = ["user", "agent", "timer", "system", "ambient", "dev"];
 
 const PRIORITIES: (Priority | "auto")[] = [
   "auto",

@@ -34,6 +34,7 @@ describe("角色模式策略", () => {
       settings.observation.enabled = true;
       const capabilities = getEffectiveBehaviorCapabilities(settings);
       expect(capabilities).toEqual({
+        companion: false,
         agent: false,
         speech: false,
         observations: false,
@@ -46,10 +47,21 @@ describe("角色模式策略", () => {
     const settings = createDefaultSettings();
     settings.behavior.mode = "companion";
     expect(getEffectiveBehaviorCapabilities(settings)).toEqual({
+      companion: true,
       agent: false,
       speech: false,
       observations: false,
       timer: true,
     });
+  });
+
+  it("自主陪伴总开关与模式策略共同决定有效状态", () => {
+    const settings = createDefaultSettings();
+    expect(getEffectiveBehaviorCapabilities(settings).companion).toBe(true);
+    settings.companion.autonomyEnabled = false;
+    expect(getEffectiveBehaviorCapabilities(settings).companion).toBe(false);
+    settings.companion.autonomyEnabled = true;
+    settings.behavior.mode = "sleep";
+    expect(getEffectiveBehaviorCapabilities(settings).companion).toBe(false);
   });
 });

@@ -71,6 +71,11 @@ body,
   --head-x: 0px;
   --head-y: 0px;
   --head-rotate: 0deg;
+  --listen-head-y: 0px;
+  --listen-head-rotate: 0deg;
+  --listen-eye-scale-y: 1;
+  --listen-brow-y: 0px;
+  --listen-mouth-y: 0px;
   --body-x: 0px;
   --body-y: 0px;
   --body-rotate: 0deg;
@@ -117,6 +122,15 @@ body,
     --music-tail-target var(--music-transition-ms) ease-out,
     --music-ear-target var(--music-transition-ms) ease-out,
     --music-particle-opacity var(--music-transition-ms) ease-out;
+}
+
+/* listen 首版只复用现有五官和头部骨骼，不要求额外 SVG 图层或 Clip。 */
+.pet-shell[data-pet-state="listen"] {
+  --listen-head-y: -1px;
+  --listen-head-rotate: -1.2deg;
+  --listen-eye-scale-y: 0.94;
+  --listen-brow-y: -0.35px;
+  --listen-mouth-y: -0.1px;
 }
 
 .pet-shell[data-media-playback="playing"] {
@@ -203,16 +217,16 @@ body,
 }
 
 .tianyi-artwork #head {
-  transform: translate(var(--head-x), var(--head-y))
-    rotate(var(--head-rotate));
+  transform: translate(var(--head-x), calc(var(--head-y) + var(--listen-head-y)))
+    rotate(calc(var(--head-rotate) + var(--listen-head-rotate)));
   transition: transform var(--look-transition-ms) ease-out;
 }
 
 /* 马尾保持在 body 后方，但连接点继承头部围绕 pivot_head 的完整姿态。 */
 .tianyi-artwork #hair-tail-left-head-follow,
 .tianyi-artwork #hair-tail-right-head-follow {
-  transform: translate(var(--head-x), var(--head-y))
-    rotate(var(--head-rotate));
+  transform: translate(var(--head-x), calc(var(--head-y) + var(--listen-head-y)))
+    rotate(calc(var(--head-rotate) + var(--listen-head-rotate)));
   transition: transform var(--look-transition-ms) ease-out;
 }
 
@@ -273,18 +287,18 @@ body,
 .tianyi-artwork #eye-right {
   transform-box: fill-box;
   transform-origin: center;
-  transform: translate(var(--eye-x), var(--eye-y));
+  transform: translate(var(--eye-x), var(--eye-y)) scaleY(var(--listen-eye-scale-y));
   transition: transform 80ms ease-out;
 }
 
 .tianyi-artwork #eyebrow-left,
 .tianyi-artwork #eyebrow-right {
-  translate: var(--brow-x) var(--brow-y);
+  translate: var(--brow-x) calc(var(--brow-y) + var(--listen-brow-y));
   transition: translate var(--look-transition-ms) ease-out;
 }
 
 .tianyi-artwork #mouth {
-  translate: var(--mouth-x) var(--mouth-y);
+  translate: var(--mouth-x) calc(var(--mouth-y) + var(--listen-mouth-y));
   transition: translate var(--look-transition-ms) ease-out;
 }
 
@@ -487,7 +501,7 @@ body,
 @keyframes pet-blink {
   0%,
   100% {
-    transform: translate(var(--eye-x), var(--eye-y)) scaleY(1);
+    transform: translate(var(--eye-x), var(--eye-y)) scaleY(var(--listen-eye-scale-y));
   }
   45%,
   65% {

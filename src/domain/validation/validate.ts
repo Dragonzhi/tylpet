@@ -37,6 +37,7 @@ const VALID_SOURCES: readonly string[] = [
   "agent",
   "timer",
   "system",
+  "ambient",
   "dev",
 ];
 

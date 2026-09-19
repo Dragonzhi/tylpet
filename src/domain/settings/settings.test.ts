@@ -55,6 +55,14 @@ describe("settings domain", () => {
       });
     });
 
+    it("默认以低频启用纯本地自主陪伴和粒子", () => {
+      expect(createDefaultSettings().companion).toEqual({
+        autonomyEnabled: true,
+        idleFrequency: "low",
+        particlesEnabled: true,
+      });
+    });
+
     it("本地语音和自动朗读默认关闭", () => {
       const settings = createDefaultSettings();
       expect(settings.speech).toEqual({
@@ -292,6 +300,28 @@ describe("settings domain", () => {
       expect(settings.behavior).toEqual({
         mode: "companion",
         onboardingCompleted: false,
+      });
+      expect(settings.companion).toEqual({
+        autonomyEnabled: true,
+        idleFrequency: "low",
+        particlesEnabled: true,
+      });
+    });
+
+    it("从 schema v10 迁移时保留现有设置并补充本地陪伴默认值", () => {
+      const settings = migrate({
+        schemaVersion: 10,
+        behavior: { mode: "quiet", onboardingCompleted: true },
+        agent: { enabled: true, provider: "mock" },
+        companion: { idleFrequency: "invalid" },
+      });
+      expect(settings.schemaVersion).toBe(11);
+      expect(settings.behavior).toEqual({ mode: "quiet", onboardingCompleted: true });
+      expect(settings.agent.enabled).toBe(true);
+      expect(settings.companion).toEqual({
+        autonomyEnabled: true,
+        idleFrequency: "low",
+        particlesEnabled: true,
       });
     });
 

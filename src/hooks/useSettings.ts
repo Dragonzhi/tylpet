@@ -120,6 +120,7 @@ export function useSettings() {
           ...base,
           ...partial,
           behavior: { ...base.behavior, ...partial.behavior },
+          companion: { ...base.companion, ...partial.companion },
           window: { ...base.window, ...partial.window },
           animation: { ...base.animation, ...partial.animation },
           audio: { ...base.audio, ...partial.audio },

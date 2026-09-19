@@ -19,6 +19,7 @@ const SOURCE_PRIORITY: Record<ActionSource, Priority> = {
   agent: "agent",
   timer: "timer",
   system: "safety-stop",
+  ambient: "idle",
   dev: "idle",
 };
 

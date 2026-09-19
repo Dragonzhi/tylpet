@@ -14,6 +14,11 @@ export function createDefaultSettings(): PetSettings {
       mode: "companion",
       onboardingCompleted: false,
     },
+    companion: {
+      autonomyEnabled: true,
+      idleFrequency: "low",
+      particlesEnabled: true,
+    },
     window: {
       x: Number.NaN,
       y: Number.NaN,

@@ -32,6 +32,10 @@ import type { MemoryCategory } from "../domain/memory/types";
 import { memoryProposalRequiresConfirmation } from "../domain/memory/proposalPolicy";
 import { insertBeforeItem, summarizeToolOnlyTurn, toolDisplayName } from "../domain/chat/toolTimeline";
 import { getBehaviorModePolicy } from "../domain/behavior/modePolicy";
+import {
+  CHAT_ATTENTION_EVENT,
+  type ChatAttentionState,
+} from "../domain/companion/types";
 import "../styles/ChatWindow.css";
 
 export default function ChatWindow() {
@@ -50,6 +54,7 @@ export default function ChatWindow() {
   const [agentCapabilities, setAgentCapabilities] = useState<AgentCapabilitySnapshot | null>(null);
   const [capabilitySyncError, setCapabilitySyncError] = useState<string | null>(null);
   const [memoryStatus, setMemoryStatus] = useState<string | null>(null);
+  const [composerFocused, setComposerFocused] = useState(false);
   const memoryControllerRef = useRef(new MemoryController());
 
   useEffect(() => {
@@ -128,6 +133,22 @@ export default function ChatWindow() {
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages]);
+
+  const attentionState: ChatAttentionState = runningRequestId
+    ? "generating"
+    : composerFocused
+      ? "listening"
+      : "idle";
+
+  useEffect(() => {
+    void emitTo("main", CHAT_ATTENTION_EVENT, { state: attentionState })
+      .catch(() => undefined);
+  }, [attentionState]);
+
+  useEffect(() => () => {
+    void emitTo("main", CHAT_ATTENTION_EVENT, { state: "idle" })
+      .catch(() => undefined);
+  }, []);
 
   if (!settings) {
     return <main className="chat-shell chat-loading">正在载入对话设置…</main>;
@@ -484,6 +505,8 @@ export default function ChatWindow() {
         <textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onFocus={() => setComposerFocused(true)}
+          onBlur={() => setComposerFocused(false)}
           onKeyDown={onInputKeyDown}
           maxLength={20_000}
           rows={3}

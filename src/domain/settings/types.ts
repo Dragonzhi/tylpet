@@ -8,7 +8,7 @@
  */
 
 /** 当前设置结构版本号 */
-export const CURRENT_SCHEMA_VERSION = 10 as const;
+export const CURRENT_SCHEMA_VERSION = 11 as const;
 
 /** 用户可直接选择的角色行为模式；模型和插件不能修改此字段。 */
 export type BehaviorMode = "companion" | "focus" | "quiet" | "sleep";
@@ -19,6 +19,19 @@ export interface BehaviorSettings {
   mode: BehaviorMode;
   /** 是否已经阅读当前预览版的本地能力与隐私说明。 */
   onboardingCompleted: boolean;
+}
+
+/** 本地自主陪伴频率；不控制用户动作、计时提醒或外部插件。 */
+export type CompanionIdleFrequency = "low" | "normal";
+
+/** Preview.3 本地陪伴导演设置；不会触发联网模型调用。 */
+export interface CompanionSettings {
+  /** 是否允许低频、离线的空闲动作。 */
+  autonomyEnabled: boolean;
+  /** 空闲动作候选间隔。 */
+  idleFrequency: CompanionIdleFrequency;
+  /** 是否显示现有的克制粒子反馈。 */
+  particlesEnabled: boolean;
 }
 
 /** 窗口位置与外观状态 */
@@ -131,6 +144,7 @@ export interface MemorySettings {
 export interface PetSettings {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION;
   behavior: BehaviorSettings;
+  companion: CompanionSettings;
   window: WindowSettings;
   animation: AnimationSettings;
   audio: AudioSettings;

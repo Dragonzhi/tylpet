@@ -9,6 +9,7 @@ import type { RendererCapabilities } from "../domain/capabilities/capabilities";
 import type { PetExpression } from "../components/TianyiArtwork";
 import { ObservationHost } from "../domain/observations/host";
 import { OBSERVATION_LIMITS } from "../config/observation";
+import { resolveCompanionCueMotion } from "../domain/companion/catalog";
 
 export interface PetRuntime {
   scheduler: BehaviorScheduler;
@@ -94,11 +95,16 @@ export function PetRuntimeProvider({
     let active = true;
     let unsubscribe: (() => void) | undefined;
     void runtime.timerController.onFinished((timer) => {
+      const motion = resolveCompanionCueMotion(
+        "task.complete",
+        capabilitiesRef.current.motions,
+      );
+      if (!motion) return;
       runtime.scheduler.submit(
         {
           id: `timer-reminder-${timer.timerId}-${timer.updatedAtUnixMs}`,
           type: "motion.play",
-          payload: { motion: "wave", speed: 1 },
+          payload: { motion, speed: 1 },
           source: "timer",
           requestedAt: Date.now(),
           correlationId: timer.timerId,

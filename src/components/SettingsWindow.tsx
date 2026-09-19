@@ -6,6 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import type {
   PetSettings,
   BehaviorSettings,
+  CompanionSettings,
   WindowSettings,
   AnimationSettings,
   AudioSettings,
@@ -170,6 +171,9 @@ export default function SettingsWindow() {
 
   const updateBehavior = (partial: Partial<BehaviorSettings>) =>
     save({ ...settings, behavior: { ...settings.behavior, ...partial } });
+
+  const updateCompanion = (partial: Partial<CompanionSettings>) =>
+    save({ ...settings, companion: { ...settings.companion, ...partial } });
 
   const updateAnimation = (partial: Partial<AnimationSettings>) =>
     save({ ...settings, animation: { ...settings.animation, ...partial } });
@@ -370,8 +374,42 @@ export default function SettingsWindow() {
           </div>
         </Section>
 
+        <Section title="自主陪伴">
+          <Row label="启用低频空闲动作">
+            <input
+              type="checkbox"
+              checked={settings.companion.autonomyEnabled}
+              onChange={(event) => updateCompanion({ autonomyEnabled: event.target.checked })}
+            />
+          </Row>
+          <Row label="空闲动作频率">
+            <select
+              value={settings.companion.idleFrequency}
+              disabled={!settings.companion.autonomyEnabled}
+              onChange={(event) => updateCompanion({
+                idleFrequency: event.target.value === "normal" ? "normal" : "low",
+              })}
+              style={textInputStyle}
+            >
+              <option value="low">低频（推荐）</option>
+              <option value="normal">标准</option>
+            </select>
+          </Row>
+          <Row label="显示克制粒子反馈">
+            <input
+              type="checkbox"
+              checked={settings.companion.particlesEnabled}
+              onChange={(event) => updateCompanion({ particlesEnabled: event.target.checked })}
+            />
+          </Row>
+          <p style={hintStyle}>
+            只使用本地已有动作和程序化表情，不会调用模型、产生费用或读取更多系统信息。陪伴模式低频触发，专注模式进一步降低频率，安静和休眠模式暂停。
+          </p>
+        </Section>
+
         <Section title="当前生效边界">
           <div style={capabilityGridStyle}>
+            <CapabilityStatus label="自主陪伴" enabled={effectiveCapabilities.companion} />
             <CapabilityStatus label="Agent 工具" enabled={effectiveCapabilities.agent} />
             <CapabilityStatus label="本机语音" enabled={effectiveCapabilities.speech} />
             <CapabilityStatus label="外部反馈" enabled={effectiveCapabilities.observations} />

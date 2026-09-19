@@ -4,6 +4,7 @@ export interface BehaviorModePolicy {
   mode: BehaviorMode;
   label: string;
   summary: string;
+  allowAutonomy: boolean;
   allowAgent: boolean;
   allowSpeech: boolean;
   allowObservations: boolean;
@@ -19,6 +20,7 @@ const POLICIES: Record<BehaviorMode, BehaviorModePolicy> = {
     mode: "companion",
     label: "陪伴",
     summary: "正常陪伴；按你的总开关允许 Agent、朗读和低频外部反馈。",
+    allowAutonomy: true,
     allowAgent: true,
     allowSpeech: true,
     allowObservations: true,
@@ -32,6 +34,7 @@ const POLICIES: Record<BehaviorMode, BehaviorModePolicy> = {
     mode: "focus",
     label: "专注",
     summary: "保留对话和番茄钟，降低聊天外反馈强度并延长冷却。",
+    allowAutonomy: true,
     allowAgent: true,
     allowSpeech: true,
     allowObservations: true,
@@ -45,6 +48,7 @@ const POLICIES: Record<BehaviorMode, BehaviorModePolicy> = {
     mode: "quiet",
     label: "安静",
     summary: "暂停 Agent、语音朗读和外部反馈，只保留轻量基础动画与手动操作。",
+    allowAutonomy: false,
     allowAgent: false,
     allowSpeech: false,
     allowObservations: false,
@@ -58,6 +62,7 @@ const POLICIES: Record<BehaviorMode, BehaviorModePolicy> = {
     mode: "sleep",
     label: "休眠",
     summary: "进入低频休眠姿态；仍可拖动、打开菜单、使用托盘和立即停止。",
+    allowAutonomy: false,
     allowAgent: false,
     allowSpeech: false,
     allowObservations: false,
@@ -74,6 +79,7 @@ export function getBehaviorModePolicy(mode: BehaviorMode): BehaviorModePolicy {
 }
 
 export interface EffectiveBehaviorCapabilities {
+  companion: boolean;
   agent: boolean;
   speech: boolean;
   observations: boolean;
@@ -85,6 +91,7 @@ export function getEffectiveBehaviorCapabilities(
 ): EffectiveBehaviorCapabilities {
   const policy = getBehaviorModePolicy(settings.behavior.mode);
   return {
+    companion: settings.companion.autonomyEnabled && policy.allowAutonomy,
     agent: settings.agent.enabled && policy.allowAgent,
     speech: settings.audio.enabled
       && settings.audio.volume > 0

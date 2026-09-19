@@ -1,6 +1,7 @@
 import { OBSERVATION_REACTION_COOLDOWN_MS } from "../../config/observation";
 import type { CapabilitySet } from "../capabilities/capabilities";
 import type { ObservationEvent, ObservationReaction } from "./types";
+import { resolveCompanionCueMotion } from "../companion/catalog";
 
 /**
  * 外部状态只映射为本地白名单语义动作。媒体事件使用专用持续状态，
@@ -23,13 +24,19 @@ export function mapObservationToReaction(
         ? { type: "expression.set", payload: { expression: "blink", durationMs: 350 }, cooldownMs: OBSERVATION_REACTION_COOLDOWN_MS }
         : null;
     case "completed":
-      return renderer.motions.includes("wave")
-        ? { type: "motion.play", payload: { motion: "wave", speed: 1 }, cooldownMs: OBSERVATION_REACTION_COOLDOWN_MS }
-        : null;
+      {
+        const motion = resolveCompanionCueMotion("task.complete", renderer.motions);
+        return motion
+          ? { type: "motion.play", payload: { motion, speed: 1 }, cooldownMs: OBSERVATION_REACTION_COOLDOWN_MS }
+          : null;
+      }
     case "failed":
-      return renderer.motions.includes("bow")
-        ? { type: "motion.play", payload: { motion: "bow", speed: 0.85 }, cooldownMs: OBSERVATION_REACTION_COOLDOWN_MS }
-        : null;
+      {
+        const motion = resolveCompanionCueMotion("task.failed", renderer.motions);
+        return motion
+          ? { type: "motion.play", payload: { motion, speed: 0.85 }, cooldownMs: OBSERVATION_REACTION_COOLDOWN_MS }
+          : null;
+      }
     case "session_started":
     case "working":
     case "stopped":

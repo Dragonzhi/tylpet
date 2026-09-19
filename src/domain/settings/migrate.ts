@@ -41,6 +41,10 @@ function mergeWithDefaults(obj: Record<string, unknown>): PetSettings {
     ? obj.behavior as Record<string, unknown>
     : {};
 
+  const companion = typeof obj.companion === "object" && obj.companion !== null
+    ? obj.companion as Record<string, unknown>
+    : {};
+
   const window = typeof obj.window === "object" && obj.window !== null
     ? obj.window as Record<string, unknown>
     : {};
@@ -85,6 +89,17 @@ function mergeWithDefaults(obj: Record<string, unknown>): PetSettings {
       onboardingCompleted: typeof behavior.onboardingCompleted === "boolean"
         ? behavior.onboardingCompleted
         : defaults.behavior.onboardingCompleted,
+    },
+    companion: {
+      autonomyEnabled: typeof companion.autonomyEnabled === "boolean"
+        ? companion.autonomyEnabled
+        : defaults.companion.autonomyEnabled,
+      idleFrequency: companion.idleFrequency === "low" || companion.idleFrequency === "normal"
+        ? companion.idleFrequency
+        : defaults.companion.idleFrequency,
+      particlesEnabled: typeof companion.particlesEnabled === "boolean"
+        ? companion.particlesEnabled
+        : defaults.companion.particlesEnabled,
     },
     window: {
       x: typeof window.x === "number" ? window.x : defaults.window.x,
